@@ -1,0 +1,33 @@
+trong folder resource là các tài liệu cũ của lập trình viên cũ đã để lại cùng các bộ cài trên các máy client
+chương trình cũ được viết trên winform hay wpf gì đó
+chương trình cũ gặp 1 vài vấn đề:
+- Đang chạy thì crash
+- khi crash giao diện bị treo không thể thao tác
+- khi đóng dấu x ở màn hình cũng bị treo giao diện không thể thao tác
+- khi khởi động phần mềm cần chờ 1-2 phút để kết nối với SQL
+- khi khởi động máy cần uninstall driver rồi cài lại driver Ch340
+- khi đóng phần mềm cũng cần uninstall rồi install lại driver cáp CH340
+- Cân điện tử đôi khi bị treo, chưa rõ do cân hay do truyền thông, cần bấm apply trên cân để cân nhảy chỉ số lại như bình thường
+- Ngoài ra trong folder đúng ra có MX Components V5 nữa nhưng tôi chưa đẩy được vào
+
+
+tôi muốn phần mềm với các yêu cầu sau:
+- Ngôn ngữ python, DB sử dụng mongoDB
+- Chú ý chống tràn mongDB, tránh để các bảng quá dài mất thời gian query
+- để nguyên dạng file py, run từ file bat, chưa đóng exe vội
+- giao diện sử dung trên web, trình duyệt là google chrome
+- giao diện và quy trình thao tác giống với giao diện gốc trên phần mềm winform phiên bản cũ
+- các tính năng sử dụng giống như phần mềm cũ
+- Ưu tiên sử dung các driver kết nối cũ
+- Xử lý hết các lỗi của phần mềm cũ
+- giao diện mở trên cổng 0.0.0.0
+- 1 file bat để chạy tool mô phỏng, giao diện web, chỉ chạy được tool mô phỏng khi chuển về chế độ manual
+- khi chuyển về chế độ auto, cần kiểm tra file bat chạy công cụ mô phỏng đã đóng chưa, nếu chưa thì chưa cho phép chạy auto
+
+lưu ý 1 điểm là đây là máy thao tác cho công nhân thôi, nên phần mềm không nên nặng quá, chỉ dùng local trong máy thôi, không dùng ngoài máy
+xây dựng các công cụ mô phỏng, check test
+
+phần mềm sẽ được cài lên sẽ cài lên khoảng 12 máy
+nhớ ghi log đầy đủ ra file để để tôi dễ dàng debug và trao đổi với bạn
+
+Hãy chủ động dựng, kiểm tra và trả ra sản phẩm vào 1 folder G8-ID-Deploy cho tôi

@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SystemConfig>
+  <CameraHIK>
+    <IpAddress>192.168.1.10</IpAddress>
+    <Port>2000</Port>
+    <CameraName></CameraName>
+    <InductionNumber>1</InductionNumber>
+    <FtpIP>149.136.0.1</FtpIP>
+  </CameraHIK>
+  <PLC>
+    <IpAddress>127.0.0.1</IpAddress>
+    <Port>2000</Port>
+    <Password>$LCDoled1234</Password>
+    <Database>pinvision</Database>
+    <Port>3307</Port>
+    <Mode>None</Mode>
+  </PLC>
+  <SQL>
+    <SQLType>MSSQL</SQLType>
+    <SQLString>Server=.\SQLEXPRESS;Database=G8_WCS;Trusted_Connection=True;</SQLString>
+  </SQL>
+</SystemConfig>

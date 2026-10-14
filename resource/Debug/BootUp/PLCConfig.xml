@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<SystemConfig>
+  <PLC>
+    <IpAddress>127.0.0.1</IpAddress>
+    <Port>2000</Port>
+    <Password>$LCDoled1234</Password>
+    <Database>pinvision</Database>
+    <Port>3307</Port>
+    <Mode>None</Mode>
+  </PLC>
+</SystemConfig>

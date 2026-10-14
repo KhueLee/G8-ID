@@ -1,0 +1,13 @@
+netsh http add urlacl url=http://+:8500/ids/cancelTask/ user=Everyone
+
+netsh advfirewall firewall add rule name="Open Port 8500" dir=in action=allow protocol=TCP localport=8500
+
+netsh advfirewall firewall show rule name="Open Port 8500"
+
+netsh http add urlacl url=http://+:8500/ids/orderTask/ user=Everyone
+
+netsh http add urlacl url=http://+:8500/ids/confirm_product/ user=Everyone
+
+https://drive.google.com/drive/folders/1HRPZ8I3OQnYrf1YmnZG9v8kNM4-Q-lMB
+
+https://drive.google.com/drive/folders/1ahFZc_apNggQDf5PnLKT2UVQn0vZI9g6

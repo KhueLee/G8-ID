@@ -1,0 +1,73 @@
+{
+  "station_id": "ST01",
+  "software_name": "ĐỊNH DANH SẢN PHẨM",
+  "ui": {
+    "host": "0.0.0.0",
+    "port": 8600,
+    "password": "1234",
+    "open_browser": true,
+    "kiosk": false
+  },
+  "order_server": {
+    "host": "0.0.0.0",
+    "port": 8500
+  },
+  "mongo": {
+    "uri": "mongodb://127.0.0.1:27017",
+    "db": "g8id",
+    "db_manual": "g8id_manual",
+    "start_bundled": true,
+    "cache_gb": 0.25,
+    "history_days": 90,
+    "event_log_days": 30,
+    "history_max_docs": 300000
+  },
+  "log": {
+    "dir": "logs",
+    "level": "INFO",
+    "keep_days": 30,
+    "raw_device": false
+  },
+  "devices": {
+    "scale": {
+      "port": "COM4",
+      "baudrate": 9600,
+      "bytesize": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "stale_s": 2.0,
+      "reopen_s": 10.0
+    },
+    "barcode": {
+      "port": "COM3",
+      "baudrate": 9600,
+      "bytesize": 8,
+      "parity": "N",
+      "stopbits": 1
+    },
+    "printer": {
+      "connect_type": "USB",
+      "usb_name": "",
+      "com_port": "COM5",
+      "baudrate": 9600,
+      "lan_ip": "",
+      "lan_port": 9100,
+      "driver_name": "Godex EZ520+",
+      "logo": "drivers/G8_Label.bmp"
+    },
+    "plc": {
+      "enabled": true,
+      "station_number": 0,
+      "progid": ""
+    }
+  },
+  "servers": {
+    "pallet_done_url": "http://192.168.110.189:8060/identify-service/ids/pallet_identify_done",
+    "timeout_s": 10,
+    "retry_s": 30
+  },
+  "simulator": {
+    "host": "127.0.0.1",
+    "port": 8700
+  }
+}

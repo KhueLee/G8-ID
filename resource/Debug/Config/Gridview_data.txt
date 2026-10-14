@@ -1,0 +1,4 @@
+Hành Động,Time
+Cân sản phẩm,1200
+In Tem,1500
+Kiểm tra tem,15000

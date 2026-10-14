@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>G8 ID - Công cụ mô phỏng</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #1d2330; color: #dde; font-family: Tahoma, "Segoe UI", Arial, sans-serif; font-size: 14px; }
+header { background: #7a4b00; color: #fff; padding: 10px 16px; font-size: 18px; font-weight: bold; display: flex; justify-content: space-between; }
+.wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; padding: 12px; }
+.card { background: #2a3142; padding: 12px 14px; border-radius: 5px; }
+.card.wide { grid-column: 1 / -1; }
+h3 { margin: 0 0 8px; color: #ffb84d; }
+button { background: #2f6fd6; color: #fff; border: none; padding: 8px 12px; margin: 3px 3px 3px 0; border-radius: 3px; font-weight: bold; cursor: pointer; }
+button.g { background: #1e8a1e; } button.r { background: #b33; } button.o { background: #c98500; }
+input, select { background: #141925; color: #fff; border: 1px solid #556; padding: 6px; width: 90px; }
+label { display: inline-block; margin: 4px 10px 4px 0; }
+.big { font-size: 34px; font-weight: bold; color: #ffb84d; }
+.lamp { display: inline-block; width: 34px; height: 34px; border-radius: 50%; background: #444; margin-right: 6px; vertical-align: middle; }
+.lamp.red.on { background: #ff2a2a; box-shadow: 0 0 12px #ff2a2a; } .lamp.yellow.on { background: #ffd500; box-shadow: 0 0 12px #ffd500; } .lamp.green.on { background: #2ee62e; box-shadow: 0 0 12px #2ee62e; }
+pre { background: #10141d; padding: 8px; max-height: 260px; overflow: auto; font: 12px Consolas, monospace; white-space: pre-wrap; word-break: break-all; margin: 6px 0 0; }
+.tag { padding: 2px 8px; border-radius: 3px; background: #444; } .tag.ok { background: #1e8a1e; } .tag.bad { background: #b33; }
+textarea { width: 100%; height: 90px; background: #141925; color: #fff; border: 1px solid #556; font: 12px Consolas, monospace; }
+</style>
+</head>
+<body>
+<header><span>CÔNG CỤ MÔ PHỎNG — G8 ĐỊNH DANH (chỉ dùng ở chế độ MANUAL)</span><span>Phần mềm chính: <span id="app" class="tag">?</span></span></header>
+<div class="wrap">
+  <div class="card">
+    <h3>Cân điện tử</h3>
+    <div class="big"><span id="weight">0</span> g</div>
+    <label>Khối lượng thùng (g) <input id="carton_weight" type="number" onchange="setv('carton_weight', +this.value)"></label><br>
+    <button class="g" onclick="post('/sim/place',{})">Đặt thùng lên cân</button>
+    <button class="o" onclick="post('/sim/place',{weight: +v('carton_weight') + 500})">Đặt thùng SAI khối lượng</button>
+    <button class="r" onclick="post('/sim/remove',{})">Nhấc thùng ra</button><br>
+    <label><input type="checkbox" id="scale_online" onchange="setv('scale_online', this.checked)" style="width:auto"> Cân đang bật (bỏ chọn = mất tín hiệu cân)</label>
+  </div>
+  <div class="card">
+    <h3>Đầu đọc mã vạch</h3>
+    <label>Kết quả đọc <select id="barcode_mode" style="width:230px" onchange="setv('barcode_mode', this.value)">
+      <option value="ok">Đọc đúng mã vừa in</option><option value="wrong_once">Đọc sai 1 lần rồi đúng</option>
+      <option value="wrong">Luôn đọc sai</option><option value="none">Không đọc được</option></select></label><br>
+    <label><input type="checkbox" id="barcode_online" onchange="setv('barcode_online', this.checked)" style="width:auto"> Đầu đọc đang nối</label>
+    <p>Mã in gần nhất: <b id="last_code">-</b></p>
+  </div>
+  <div class="card">
+    <h3>Máy in tem</h3>
+    <label><input type="checkbox" id="printer_online" onchange="setv('printer_online', this.checked)" style="width:auto"> Máy in đang nối</label><br>
+    <label><input type="checkbox" id="printer_fail" onchange="setv('printer_fail', this.checked)" style="width:auto"> Giả lập in lỗi</label>
+    <pre id="labels"></pre>
+  </div>
+  <div class="card">
+    <h3>PLC / đèn tháp</h3>
+    <span class="lamp red" id="l-red"></span><span class="lamp yellow" id="l-yellow"></span><span class="lamp green" id="l-green"></span> <b id="light">off</b><br>
+    <label><input type="checkbox" id="plc_online" onchange="setv('plc_online', this.checked)" style="width:auto"> PLC đang nối</label>
+  </div>
+  <div class="card">
+    <h3>Hệ thống gửi lệnh (WMS)</h3>
+    <label>Số pallet <input id="o-pallets" type="number" value="2"></label>
+    <label>Thùng/pallet <input id="o-cartons" type="number" value="3"></label>
+    <label>Weight_ref (0 = dùng cài đặt) <input id="o-weight" type="number" value="0"></label><br>
+    <label><input type="checkbox" id="o-piped" checked style="width:auto"> Carton_List dạng a|b|...|MÃ|k</label><br>
+    <button class="g" onclick="order()">Gửi lệnh sản xuất</button>
+    <h3 style="margin-top:12px">Hủy lệnh (/ids/cancelTask/)</h3>
+    <label>Task_ID <input id="c-task" style="width:150px"></label> <button class="r" onclick="post('/sim/cancel',{Task_ID: v('c-task')})">Gửi hủy</button>
+    <h3 style="margin-top:12px">Gửi bản tin thô</h3>
+    <label>Đường dẫn <input id="raw-path" style="width:200px" value="/ids/orderTask/"></label>
+    <textarea id="raw-body" placeholder='Dán JSON lệnh thật chép từ logs\http-*.log'></textarea>
+    <button onclick="raw()">Gửi</button>
+  </div>
+  <div class="card">
+    <h3>Server nhận pallet (pallet_identify_done)</h3>
+    <label>Phản hồi <select id="server_mode" style="width:200px" onchange="setv('server_mode', this.value)">
+      <option value="ok">200 SUCCESS</option><option value="error">500 lỗi</option><option value="timeout">Không trả lời (timeout)</option></select></label>
+    <pre id="received"></pre>
+  </div>
+  <div class="card">
+    <h3>Công nhân ảo (chạy tự động)</h3>
+    <label><input type="checkbox" id="auto" onchange="setv('auto', this.checked)" style="width:auto"> Tự đặt / nhấc thùng theo trạng thái trạm</label><br>
+    <label><input type="checkbox" id="auto_identify" onchange="setv('auto_identify', this.checked)" style="width:auto"> Tự bấm ĐỊNH DANH khi xong pallet</label>
+    <p style="color:#99a">Dùng để chạy thử liên tục nhiều lệnh. Vẫn phải bấm Bắt đầu trên màn hình chính.</p>
+  </div>
+  <div class="card wide"><h3>Nhật ký mô phỏng</h3><pre id="events" style="max-height:340px"></pre></div>
+</div>
+<script>
+const $ = id => document.getElementById(id), v = id => $(id).value;
+async function post(path, body) { const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r.json(); }
+function setv(k, val) { post('/sim/set', { [k]: val }); }
+async function order() { const r = await post('/sim/order', { pallets: +v('o-pallets'), cartons: +v('o-cartons'), piped: $('o-piped').checked, weight_ref: +v('o-weight') }); $('c-task').value = r.order.Task_ID; if (!r.ok) alert('Phần mềm chính trả lỗi: HTTP ' + r.status + ' ' + JSON.stringify(r.resp)); }
+async function raw() { let b; try { b = JSON.parse(v('raw-body')); } catch (e) { return alert('JSON sai: ' + e); } const r = await post('/sim/raw', { path: v('raw-path'), body: b }); alert('HTTP ' + r.status + ' ' + JSON.stringify(r.resp)); }
+async function tick() {
+  try {
+    const s = await (await fetch('/sim/state')).json();
+    $('weight').textContent = s.weight; $('last_code').textContent = s.last_code || '-'; $('light').textContent = s.light;
+    ['red', 'yellow', 'green'].forEach(c => $('l-' + c).classList.toggle('on', s.light === c));
+    ['scale_online', 'barcode_online', 'printer_online', 'printer_fail', 'plc_online', 'auto', 'auto_identify'].forEach(k => $(k).checked = s[k]);
+    ['barcode_mode', 'server_mode'].forEach(k => { if (document.activeElement !== $(k)) $(k).value = s[k]; });
+    if (document.activeElement !== $('carton_weight')) $('carton_weight').value = s.carton_weight;
+    $('labels').textContent = s.labels.slice().reverse().map(l => JSON.stringify(l)).join('\n') || '(chưa in tem nào)';
+    $('received').textContent = s.received.slice().reverse().map(l => l.t + ' ' + JSON.stringify(l.body)).join('\n') || '(chưa nhận bản tin nào)';
+    $('events').textContent = s.events.slice().reverse().join('\n');
+    const a = $('app'); a.textContent = s.app + (s.app_running ? ' · RUN' : ' · STOP'); a.className = 'tag ' + (s.app === 'MANUAL' ? 'ok' : 'bad');
+  } catch (e) { $('app').textContent = 'mô phỏng đã tắt'; $('app').className = 'tag bad'; }
+  setTimeout(tick, 400);
+}
+tick();
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>G8 - Định danh sản phẩm</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="offline" class="banner red hidden">MẤT KẾT NỐI VỚI PHẦN MỀM — đang thử nối lại...</div>
+<div id="manualBanner" class="banner yellow hidden">CHẾ ĐỘ MANUAL (MÔ PHỎNG) — không dùng cho sản xuất thật</div>
+
+<header>
+  <div class="logo"><span class="g8">G8</span><span class="home">HOME</span></div>
+  <div class="title"><div id="swName">ĐỊNH DANH SẢN PHẨM</div><small>G8 HOME</small></div>
+  <div class="inds">
+    <span class="ind" id="ind-plc">PLC</span>
+    <span class="ind" id="ind-printer">PRINTER</span>
+    <span class="ind" id="ind-scale">SCALE</span>
+    <span class="ind" id="ind-barcode">BARCODE</span>
+    <span class="ind" id="ind-wcs">WCS</span>
+    <span class="ind" id="ind-rcs">RCS</span>
+  </div>
+  <div class="lamps"><i id="lamp-red"></i><i id="lamp-yellow"></i><i id="lamp-green"></i></div>
+  <button id="btnIdentify" class="hbtn" disabled>&#9211; Định danh</button>
+  <div class="clock"><b id="clock">--:--:--</b><small id="meta"></small></div>
+</header>
+
+<nav>
+  <button data-tab="home" class="active">&#8962; Trang chủ</button>
+  <button data-tab="settings">&#9881; Cài đặt</button>
+  <button data-tab="info">&#9776; Thông số</button>
+  <button data-tab="logs">&#10150; Lịch sử Log</button>
+</nav>
+
+<main>
+<section id="tab-home" class="tab">
+  <div class="left">
+    <div class="curbox"><div class="lbl">THÙNG HIỆN TẠI:</div><div class="num" id="curDone">0</div><div class="num" id="curTotal">/0</div></div>
+    <div class="row"><span>Mã lệnh:</span><b id="f-po">N/A</b></div>
+    <div class="row"><span>Mã pallet:</span><b id="f-pallet">N/A</b></div>
+    <div class="row"><span>Vị trí:</span><b id="f-loc">N/A</b></div>
+    <div class="row"><span>Tên sản phẩm:</span><b id="f-item">N/A</b></div>
+    <div class="row"><span>Quy cách:</span><b id="f-spec">N/A</b></div>
+    <div class="row"><span>Cân nặng:</span><b id="f-weight">N/A</b></div>
+    <div class="row"><span>Pallet hoàn thành:</span><b id="f-pallets">0/0</b></div>
+    <div class="row"><span>Số thùng hoàn thành:</span><b id="f-order">0/0</b></div>
+    <div class="row"><span>Ngày in trên tem:</span><b id="f-date">N/A</b></div>
+    <div class="logbox" id="logbox"></div>
+    <div class="positions">
+      <div class="pos" id="pos0"><small>VỊ TRÍ 01</small><b></b></div>
+      <div class="pos" id="pos1"><small>VỊ TRÍ 02</small><b></b></div>
+      <div class="pos" id="pos2"><small>VỊ TRÍ 03</small><b></b></div>
+    </div>
+  </div>
+  <div class="center">
+    <div class="tablewrap">
+      <table id="list"><thead><tr><th style="width:10%">STT</th><th style="width:30%">Mã định danh</th><th style="width:30%">Trạng thái</th><th>Mã Pallet</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="msgbar"><div class="arrow">&#10140;</div><div id="message"></div></div>
+  </div>
+  <div class="right">
+    <div class="wbox"><div class="lbl">KHỐI LƯỢNG CÂN:</div><div id="weight">0 g</div></div>
+    <div id="big" class="big">STOP</div>
+    <button id="btnReset" class="reset">Đặt lại bộ đếm</button>
+    <div class="cnt pass"><span>Đạt</span><span id="c-pass">0/0</span><span id="c-ppass">0.0%</span></div>
+    <div class="cnt fail"><span>Sai</span><span id="c-fail">0/0</span><span id="c-pfail">0.0%</span></div>
+    <div class="ctrl"><button id="btnStart" class="start">&#9654; Bắt đầu</button><button id="btnStop" class="stop">&#9632; Dừng</button></div>
+  </div>
+</section>
+
+<section id="tab-settings" class="tab hidden page">
+  <div class="cards">
+    <div class="card">
+      <h3>Chế độ chạy</h3>
+      <p>Hiện tại: <b id="s-mode">?</b></p>
+      <p class="hint">AUTO = thiết bị thật, dữ liệu sản xuất. MANUAL = nối công cụ mô phỏng (run_simulator.bat), dữ liệu riêng. Chỉ chuyển AUTO được khi cửa sổ run_simulator.bat đã đóng.</p>
+      <button class="b" onclick="setMode('AUTO')">Chuyển AUTO</button>
+      <button class="b warn" onclick="setMode('MANUAL')">Chuyển MANUAL</button>
+    </div>
+    <div class="card">
+      <h3>Thông số cân / pallet</h3>
+      <label>Khối lượng chuẩn (g)<input id="s-scale_value" type="number"></label>
+      <label>Sai số cho phép (g)<input id="s-scale_error" type="number"></label>
+      <label>Thời gian cân (s)<input id="s-time_scale" type="number"></label>
+      <label>Chờ trước khi in tem pallet (s)<input id="s-pallet_print_delay_s" type="number"></label>
+      <label class="chk"><input id="s-print_pallet" type="checkbox"> In + quét mã pallet</label>
+      <label class="chk"><input id="s-confirm_new_order" type="checkbox"> Hỏi Yes/No khi có lệnh mới</label>
+      <label class="chk"><input id="s-auto_start_on_order" type="checkbox"> Có lệnh mới thì tự Bắt đầu</label>
+      <label>Gửi pallet về server<select id="s-pallet_done_trigger"><option value="button">Bấm nút ĐỊNH DANH</option><option value="auto">Tự động khi chốt pallet</option></select></label>
+      <label>Số lần đọc mã vạch<input id="s-barcode_retries" type="number"></label>
+      <label>Thời gian chờ đọc mã (ms)<input id="s-barcode_timeout_ms" type="number"></label>
+      <h4>Vị trí sàn</h4>
+      <div class="grid3"><input id="s-pos0"><input id="s-pos1"><input id="s-pos2"><input id="s-pos3"><input id="s-pos4"><input id="s-pos5"></div>
+      <button class="b ok" onclick="saveSettings()">OK - Lưu thông số</button>
+    </div>
+    <div class="card">
+      <h3>Thiết bị</h3>
+      <h4>Cân (RS232)</h4>
+      <div class="grid2"><label>Cổng<input id="d-scale-port" list="comlist"></label><label>Baudrate<input id="d-scale-baudrate" type="number"></label></div>
+      <h4>Đầu đọc mã vạch (RS232)</h4>
+      <div class="grid2"><label>Cổng<input id="d-barcode-port" list="comlist"></label><label>Baudrate<input id="d-barcode-baudrate" type="number"></label></div>
+      <h4>Máy in Godex</h4>
+      <div class="grid2">
+        <label>Kiểu kết nối<select id="d-printer-connect_type"><option>USB</option><option>COM</option><option>LAN</option><option>DRIVER</option></select></label>
+        <label>Tên USB (trống = tự tìm)<input id="d-printer-usb_name"></label>
+        <label>Cổng COM<input id="d-printer-com_port" list="comlist"></label>
+        <label>IP LAN<input id="d-printer-lan_ip"></label>
+        <label>Tên driver Windows<input id="d-printer-driver_name"></label>
+      </div>
+      <h4>PLC / đèn tháp (MX Component)</h4>
+      <div class="grid2"><label class="chk"><input id="d-plc-enabled" type="checkbox"> Dùng PLC</label><label>Logical Station<input id="d-plc-station_number" type="number"></label></div>
+      <h4>Server nhận pallet</h4>
+      <label>URL<input id="v-pallet_done_url"></label>
+      <datalist id="comlist"></datalist>
+      <p class="hint" id="comhint"></p>
+      <button class="b ok" onclick="saveDevices()">Lưu + kết nối lại thiết bị</button>
+    </div>
+    <div class="card">
+      <h3>Thao tác tay</h3>
+      <label>In thử tem<input id="m-print" placeholder="Nội dung mã"></label>
+      <button class="b" onclick="act('/api/print_manual',{text:val('m-print')},'IN THÀNH CÔNG')">In thử</button>
+      <button class="b" onclick="act('/api/reprint',{},'Đã in lại tem')">In lại tem thùng gần nhất</button>
+      <button class="b warn" onclick="reprintPallet('')">In lại toàn bộ tem pallet đang làm</button>
+      <p class="hint">In lại tem của mọi thùng đã đạt + tem pallet (nếu pallet đã chốt). Pallet đã xong: thẻ Thông số → Lịch sử pallet → “In lại tem”. Bấm Dừng để hủy giữa chừng.</p>
+      <h4>Đổi mật khẩu</h4>
+      <label>Mật khẩu mới<input id="m-pass" type="password"></label>
+      <button class="b" onclick="changePass()">Đổi mật khẩu</button>
+      <h4>Phần mềm</h4>
+      <button class="b danger" onclick="quitApp()">Thoát phần mềm</button>
+    </div>
+  </div>
+</section>
+
+<section id="tab-info" class="tab hidden page">
+  <div class="cards">
+    <div class="card"><h3>Trạm</h3><table class="kv" id="i-station"></table></div>
+    <div class="card"><h3>Kết nối</h3><table class="kv" id="i-dev"></table></div>
+    <div class="card"><h3>Cơ sở dữ liệu</h3><table class="kv" id="i-db"></table></div>
+    <div class="card wide"><h3>Hàng chờ pallet</h3><table class="grid" id="i-queue"></table></div>
+    <div class="card wide">
+      <h3>Lịch sử pallet</h3>
+      <div class="bar">Từ <input type="date" id="h-from"> đến <input type="date" id="h-to"> <input id="h-q" placeholder="Mã pallet / mã lệnh"> <button class="b" onclick="loadHistory()">Tìm</button></div>
+      <table class="grid" id="i-his"></table>
+      <table class="grid" id="i-his-parcels"></table>
+    </div>
+  </div>
+</section>
+
+<section id="tab-logs" class="tab hidden page">
+  <div class="bar">File <select id="l-file"></select> Lọc <input id="l-grep" placeholder="mã thùng, mã pallet, ERROR..."> <button class="b" onclick="loadLogs()">Xem</button> <span class="hint" id="l-dir"></span></div>
+  <pre id="l-out"></pre>
+</section>
+</main>
+
+<div id="modal" class="modal hidden"><div class="mbox"><h3 id="m-title"></h3><p id="m-text"></p><input id="m-input" type="password" class="hidden"><div class="mbtns" id="m-btns"></div></div></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
