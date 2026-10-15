@@ -14,7 +14,13 @@ bố cục màn hình và driver thiết bị của bản cũ; giao diện chạ
  1) Cài Python 3.10 trở lên, 64-bit, tick "Add python.exe to PATH".
     (Bộ thư viện offline trong wheels\ dành cho Python 3.13 64-bit; phiên bản khác
     thì install.bat tự tải qua internet.)
- 2) Chép cả thư mục G8-ID-Deploy vào máy (ví dụ D:\G8-ID-Deploy).
+ 2) Cài Git rồi lấy code về (máy cần vào được github.com; nếu mạng chặn thì chép
+    cả thư mục G8-ID-Deploy qua USB thay cho bước này). Trong PowerShell:
+        winget install --id Git.Git -e
+        (hoặc tải "64-bit Git for Windows Setup" ở git-scm.com)
+        -> đóng PowerShell, mở lại, kiểm tra: git --version
+        git clone https://github.com/KhueLee/G8-ID.git C:\G8-ID
+    Phần mềm nằm ở C:\G8-ID\G8-ID-Deploy. Repo public, không cần đăng nhập.
  3) Chạy install.bat.
  4) Sửa config.json: station_id, cổng COM của cân / đầu đọc, địa chỉ pallet_done_url.
     (Cổng COM và máy in cũng sửa được trong thẻ Cài đặt.)
@@ -33,6 +39,43 @@ bố cục màn hình và driver thiết bị của bản cũ; giao diện chạ
 MongoDB KHÔNG CẦN CÀI: mongodb\bin\mongod.exe (bản 4.4, chạy được cả trên CPU không
 có AVX) được phần mềm tự bật, chỉ nghe ở 127.0.0.1, dữ liệu nằm trong data\db. Nếu
 máy đã có MongoDB chạy sẵn ở cổng 27017 thì phần mềm dùng luôn cái đó.
+
+MÁY ĐANG CHẠY BẢN TẢI ZIP (thư mục kiểu ...\G8-ID-main\, không git pull được): làm
+bước 2 ở trên để clone ra C:\G8-ID, rồi khi G8 ID đã đóng, chép dữ liệu của trạm
+sang (cấu hình riêng + dữ liệu MongoDB; data không có trên git). Trong PowerShell:
+    $old = "C:\Users\Admin\Desktop\v2\G8-ID-main\G8-ID-Deploy"   (sửa theo thư mục cũ)
+    $new = "C:\G8-ID\G8-ID-Deploy"
+    Copy-Item "$old\config.json" "$new\config.json" -Force
+    Copy-Item "$old\data" "$new\data" -Recurse -Force
+Sau đó chạy install.bat, mở run_app.bat ở thư mục mới, sửa shortcut trong
+shell:startup (nếu có) trỏ sang C:\G8-ID\G8-ID-Deploy\run_app.bat. Chạy ổn rồi mới
+xoá thư mục cũ.
+
+
+-------------------------------------------------------------------------------
+ 1b. CẬP NHẬT BẢN MỚI (MỖI LẦN CÓ BẢN MỚI)
+-------------------------------------------------------------------------------
+
+ 1) Đóng G8 ID (cửa sổ đen của run_app.bat) và công cụ mô phỏng.
+ 2) Trong PowerShell:
+        cd C:\G8-ID
+        git pull
+ 3) Chạy install.bat (cài thư viện mới nếu bản mới có thêm; chạy lại khi không
+    có gì mới cũng không sao).
+ 4) Mở lại run_app.bat, xem log khởi động không có dòng [ERROR].
+
+config.json nằm trên git, nên nếu trạm đã sửa nó thì git pull báo "Your local
+changes to the following files would be overwritten". Khi đó cất cấu hình của trạm
+lại, kéo về, rồi lấy lại:
+        git stash
+        git pull
+        git stash pop
+git stash pop báo CONFLICT thì mở G8-ID-Deploy\config.json: phần giữa ======= và
+">>>>>>> Stashed changes" là giá trị của trạm, phần trên là bản mới. Giữ đúng giá
+trị của trạm, xoá ba dòng đánh dấu (<<<<<<<, =======, >>>>>>>), lưu file, rồi chạy
+git reset và git stash drop. Không chắc thì gửi nội dung lỗi cho người hỗ trợ.
+Không dùng git reset --hard hay xoá thư mục data - sẽ mất cấu hình / dữ liệu của
+trạm.
 
 
 -------------------------------------------------------------------------------
