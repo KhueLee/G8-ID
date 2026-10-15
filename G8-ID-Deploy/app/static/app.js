@@ -36,7 +36,10 @@ function render(s) {
   $('swName').textContent = s.software;
   $('clock').textContent = s.time;
   $('meta').textContent = `${s.date} · v${s.version} · ${s.station} · ${s.mode}`;
-  $('manualBanner').classList.toggle('hidden', s.mode !== 'MANUAL');
+  $('manualBanner').classList.toggle('hidden', s.mode === 'AUTO');
+  $('manualBanner').textContent = s.mode === 'HYBRID'
+    ? 'CHẾ ĐỘ HYBRID (THIẾT BỊ THẬT + WCS/RCS MÔ PHỎNG) — không dùng cho sản xuất thật'
+    : 'CHẾ ĐỘ MANUAL (MÔ PHỎNG) — không dùng cho sản xuất thật';
   ['plc', 'printer', 'scale', 'barcode'].forEach(k => { ind('ind-' + k, s.dev[k].ok); $('ind-' + k).title = s.dev[k].detail; });
   ind('ind-wcs', s.wcs); ind('ind-rcs', s.rcs === null ? null : s.rcs); $('ind-rcs').title = s.rcs_error || '';
   ['red', 'yellow', 'green'].forEach(c => $('lamp-' + c).classList.toggle('on', s.light === c));

@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title G8 ID - Cong cu mo phong (chi dung o che do MANUAL)
+title G8 ID - Cong cu mo phong (chi dung o che do MANUAL / HYBRID)
 cd /d "%~dp0"
 set PYTHONUTF8=1
 set PYTHONUNBUFFERED=1

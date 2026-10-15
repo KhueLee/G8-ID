@@ -268,8 +268,8 @@ def build_order_server(engine):
         except ValueError:
             return reply(400, 1001, "Invalid JSON", raw)
         if engine.manual and request.remote_addr not in ("127.0.0.1", "::1"):
-            # MANUAL dùng DB mô phỏng: không nuốt lệnh thật của WMS vào đó.
-            return reply(503, 1001, "Station is in MANUAL (simulation) mode", raw)
+            # MANUAL/HYBRID dùng DB mô phỏng: không nuốt lệnh thật của WMS vào đó.
+            return reply(503, 1001, "Station is in %s (simulation) mode" % engine.mode, raw)
         try:
             if action == "order":
                 engine.receive_order(data, request.remote_addr)

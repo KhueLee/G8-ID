@@ -1,7 +1,8 @@
 """Công cụ mô phỏng (chạy bằng run_simulator.bat) - giả lập cân, đầu đọc, máy in, đèn tháp,
-hệ thống gửi lệnh (WMS) và server nhận pallet. Giao diện web: http://127.0.0.1:8700
+hệ thống gửi lệnh (WMS/WCS) và server nhận pallet (RCS). Giao diện web: http://127.0.0.1:8700
 
-Chỉ chạy được khi phần mềm chính đang ở chế độ MANUAL; thấy phần mềm chính về AUTO là tự thoát.
+Chỉ chạy được khi phần mềm chính đang ở MANUAL (mô phỏng toàn bộ) hoặc HYBRID (thiết bị thật tại
+bàn, chỉ dùng phần WCS/RCS của công cụ này); thấy phần mềm chính về AUTO là tự thoát.
 """
 import json
 import logging
@@ -242,7 +243,8 @@ def heartbeat():
 
 
 def auto_worker():
-    """Công nhân ảo: đặt thùng khi trạm chờ, nhấc thùng khi có kết quả, bấm ĐỊNH DANH."""
+    """Công nhân ảo: đặt thùng khi trạm chờ, nhấc thùng khi có kết quả, bấm ĐỊNH DANH.
+    HYBRID: cân là cân thật nên chỉ còn tự bấm ĐỊNH DANH."""
     placed_at = 0.0
     while True:
         time.sleep(0.25)
@@ -255,12 +257,14 @@ def auto_worker():
         if not st.get("running"):
             continue
         msg = st.get("message", "")
-        if S["weight"] == 0 and (msg.startswith("CHỜ ĐẶT") or msg.startswith("SẴN SÀNG")):
+        fake_scale = st.get("mode") != "HYBRID"      # HYBRID: cân thật, người đặt / nhấc thùng
+        if fake_scale and S["weight"] == 0 and (msg.startswith("CHỜ ĐẶT")
+                                                or msg.startswith("SẴN SÀNG")):
             if st.get("rows") and any(r["st"] == 0 for r in st["rows"]):
                 S["weight"] = S["carton_weight"]
                 placed_at = time.time()
                 note("[AUTO] Đặt thùng %s g" % S["weight"])
-        elif S["weight"] > 0 and time.time() - placed_at > 1.0 and (
+        elif fake_scale and S["weight"] > 0 and time.time() - placed_at > 1.0 and (
                 st.get("big") in ("OK", "NG") and not msg.startswith(("CÂN", "ĐANG IN", "ĐANG ĐỌC",
                                                                       "ĐỌC MÃ LỖI"))
                 or msg.startswith(("IN MÃ PALLET", "VUI LÒNG", "ĐÃ HOÀN THÀNH", "PALLET"))):
@@ -282,11 +286,11 @@ def main():
         _, r = call(APP + "/api/mode", timeout=3)
     except Exception as e:
         print("\n[!] KHÔNG KẾT NỐI ĐƯỢC PHẦN MỀM CHÍNH (%s): %s" % (APP, e))
-        print("    Hãy chạy run_app.bat trước, chuyển sang MANUAL rồi mới chạy công cụ mô phỏng.")
+        print("    Hãy chạy run_app.bat trước, chuyển sang MANUAL / HYBRID rồi mới chạy công cụ mô phỏng.")
         return 2
-    if r.get("mode") != "MANUAL":
+    if r.get("mode") not in ("MANUAL", "HYBRID"):
         print("\n[!] PHẦN MỀM CHÍNH ĐANG Ở CHẾ ĐỘ %s." % r.get("mode"))
-        print("    Công cụ mô phỏng chỉ chạy được ở MANUAL: thẻ Cài đặt -> Chuyển MANUAL.")
+        print("    Công cụ mô phỏng chỉ chạy được ở MANUAL / HYBRID: thẻ Cài đặt -> Chuyển chế độ.")
         log.error("Từ chối chạy: phần mềm chính đang ở %s", r.get("mode"))
         return 2
     host, port = cfg["simulator"]["host"], cfg["simulator"]["port"]

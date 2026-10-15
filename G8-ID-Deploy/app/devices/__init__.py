@@ -1,4 +1,4 @@
-"""Thiết bị tại trạm. AUTO = thiết bị thật (driver cũ), MANUAL = nối tới công cụ mô phỏng."""
+"""Thiết bị tại trạm. AUTO/HYBRID = thiết bị thật (driver cũ), MANUAL = nối tới công cụ mô phỏng."""
 import logging
 
 log = logging.getLogger("device")

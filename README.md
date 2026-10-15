@@ -88,7 +88,7 @@ git stash pop
 | File | Việc |
 |---|---|
 | `run_app.bat` | Chạy phần mềm + mở Chrome. Chết bất thường thì tự chạy lại sau 3 s. |
-| `run_simulator.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL**. |
+| `run_simulator.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL** / **HYBRID**. |
 | `check_env.bat` | Kiểm tra máy (Python, thư viện, COM, máy in, MX Component, firewall) → `logs\check_env.txt`. |
 | `run_tests.bat` | 19 bài kiểm tra tự động (~2 phút), chạy được ngay trên máy trạm. |
 | `install.bat` | Cài thư viện Python. |
@@ -100,6 +100,10 @@ git stash pop
   **MANUAL**: thiết bị và server giả của công cụ mô phỏng, DB riêng `g8id_manual`; cổng 8500 chỉ
   nhận lệnh từ chính máy (lệnh WMS bị trả 503). Đổi ở thẻ Cài đặt khi đang STOP. Không chuyển /
   chạy AUTO được khi cửa sổ `run_simulator.bat` còn mở.
+  **HYBRID**: chạy thử thực tế tại bàn định danh — cân, đầu đọc, máy in, PLC là thiết bị thật
+  (theo `config.json`), còn hệ thống bên ngoài là công cụ mô phỏng: gửi lệnh (WMS/WCS) và nhận
+  pallet (RCS). Dữ liệu và giới hạn cổng 8500 giống MANUAL. Phần thiết bị giả trên công cụ mô
+  phỏng bị làm mờ; công nhân ảo chỉ còn tự bấm ĐỊNH DANH.
 - Đủ thùng của pallet → “ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH”; công nhân bấm **Định
   danh** thì mới gửi pallet lên server (đổi sang tự gửi: Cài đặt → *Gửi pallet về server*).
 - Đèn trạng thái trên thanh đầu: xanh = tốt, nền đỏ = lỗi (rê chuột xem lý do), cam = chưa có

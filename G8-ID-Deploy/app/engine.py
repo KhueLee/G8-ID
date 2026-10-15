@@ -22,6 +22,9 @@ log = logging.getLogger("engine")
 http_log = logging.getLogger("http.out")
 
 ACTIVE = ("PROCESSING", "FINALIZING", "AWAIT_SEND")
+# AUTO = sản xuất thật. MANUAL = mô phỏng toàn bộ. HYBRID = thiết bị thật tại bàn, chỉ mô phỏng
+# hệ thống bên ngoài (WMS/WCS gửi lệnh, RCS nhận pallet) bằng công cụ mô phỏng.
+MODES = ("AUTO", "MANUAL", "HYBRID")
 STATUS_TEXT = {0: "Chờ in", 1: "Đã lên bảng kê", 2: "Đã lên bảng kê", 3: "Chờ in Palet",
                4: "Chờ gửi Palet", 5: "Hoàn tất Palet"}
 
@@ -71,7 +74,7 @@ class Engine:
         self.mode = self._load_mode()
         self.settings = self._load_settings()
         self.db = db.data_db(self.manual)
-        self.dev = devices.build(self.cfg, self.manual)
+        self.dev = devices.build(self.cfg, self.sim_devices)
         self.running = False
         self._stop_evt = threading.Event()
         self._thread = None
@@ -98,13 +101,19 @@ class Engine:
     # ------------------------------------------------------------------ cấu hình
     @property
     def manual(self):
+        """MANUAL và HYBRID: DB mô phỏng, WCS/RCS là công cụ mô phỏng, không dùng cho sản xuất."""
+        return self.mode in ("MANUAL", "HYBRID")
+
+    @property
+    def sim_devices(self):
+        """Chỉ MANUAL dùng thiết bị giả; HYBRID chạy thiết bị thật tại bàn định danh."""
         return self.mode == "MANUAL"
 
     def _load_mode(self):
         try:
             with open(config.MODE_FILE, "r", encoding="utf-8") as f:
                 m = json.load(f).get("mode", "AUTO")
-                return m if m in ("AUTO", "MANUAL") else "AUTO"
+                return m if m in MODES else "AUTO"
         except (OSError, ValueError):
             return "AUTO"
 
@@ -477,7 +486,7 @@ class Engine:
 
     def set_mode(self, mode):
         mode = str(mode).upper()
-        if mode not in ("AUTO", "MANUAL"):
+        if mode not in MODES:
             raise OrderError("Chế độ không hợp lệ")
         with self.lock:
             if mode == self.mode:
@@ -495,7 +504,7 @@ class Engine:
             self.mode = mode
             self._save_mode()
             self.db = db.data_db(self.manual)
-            self.dev = devices.build(self.cfg, self.manual)
+            self.dev = devices.build(self.cfg, self.sim_devices)
             self.dev.start()
             self.light, self.weight, self._need_zero = "off", 0, False
             self.rcs, self.rcs_error = None, ""
@@ -511,7 +520,7 @@ class Engine:
             log.info("Kết nối lại toàn bộ thiết bị theo cấu hình mới")
             self.dev.stop()
             self.cfg = config.get()
-            self.dev = devices.build(self.cfg, self.manual)
+            self.dev = devices.build(self.cfg, self.sim_devices)
             self.dev.start()
 
     # ------------------------------------------------------------------ vòng lặp chính

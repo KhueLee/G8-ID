@@ -586,6 +586,27 @@ def e2e_tests(env):
         wait(lambda: not state()["running"], 15, "STOP")
         print("         (khởi động lại sau mất điện: %.1f s, tiến độ còn nguyên)" % secs)
 
+    def t_hybrid():
+        # HYBRID: thiết bị thật, WCS/RCS vẫn là công cụ mô phỏng (không bị đuổi về như AUTO)
+        r = http(APP + "/api/mode", {"mode": "HYBRID"})[1]
+        assert r["ok"], r
+        time.sleep(2.5)
+        assert env.sim.poll() is None, "công cụ mô phỏng phải chạy tiếp ở HYBRID"
+        assert http(SIMU + "/sim/state")[1]["app"] == "HYBRID"
+        info = http(APP + "/api/info")[1]
+        assert ":%d/" % SIM in info["pallet_done_url"], info["pallet_done_url"]
+        assert info["db_name"].endswith("manual"), info["db_name"]
+        o = order(1, 2)
+        assert any(q["task_id"] == o["Task_ID"] for q in http(APP + "/api/info")[1]["queue"])
+        # Thiết bị thật không có trên máy thử -> Bắt đầu bị chặn đúng thông báo
+        r = http(APP + "/api/start", {})[1]
+        assert not r["ok"] and "MÁY IN" in r["error"], r
+        assert http(SIMU + "/sim/cancel", {"Task_ID": o["Task_ID"]})[1]["ok"]
+        r = http(APP + "/api/mode", {"mode": "MANUAL"})[1]
+        assert r["ok"], r
+        wait(lambda: all(state()["dev"][k]["ok"] for k in ("printer", "scale", "barcode")), 15,
+             "thiết bị mô phỏng nối lại")
+
     def t_interlock():
         # Mô phỏng còn chạy -> không cho về AUTO
         r = http(APP + "/api/mode", {"mode": "AUTO"})[1]
@@ -640,6 +661,7 @@ def e2e_tests(env):
     check("Server lỗi: giữ pallet, tự gửi lại tới khi nhận", t_server_retry)
     check("Lệnh gửi lặp không nhân đôi; cancelTask hủy lệnh; confirm_product", t_cancel_and_duplicate)
     check("Mất điện giữa lệnh: khởi động lại còn nguyên tiến độ", t_power_loss)
+    check("HYBRID: thiết bị thật + WCS/RCS mô phỏng", t_hybrid)
     check("Khoá liên động AUTO <-> công cụ mô phỏng", t_interlock)
     check("Thoát sạch: mã 0, đóng cổng, tắt mongod, có log", t_clean_exit)
 
