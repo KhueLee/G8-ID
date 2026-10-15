@@ -29,6 +29,9 @@ STATUS_TEXT = {0: "Chờ in", 1: "Đã lên bảng kê", 2: "Đã lên bảng k�
                4: "Chờ gửi Palet", 5: "Hoàn tất Palet"}
 
 GRAY, ORANGE, RED, GREEN, LIME, BLUE = "gray", "orange", "red", "green", "lime", "blue"
+# Đầu đọc tự tắt tia sau thời gian quét của nó (scanner_timeout.bat) -> kích lại định kỳ để
+# nghe liên tục tới khi có mã, như bản cũ (ReadBarcoder chờ tới khi có dữ liệu hoặc bấm Dừng).
+BARCODE_RETRIGGER_MS = 60000
 
 
 class Stopped(Exception):
@@ -131,9 +134,7 @@ class Engine:
         return s
 
     def save_settings(self, patch):
-        if self.running:
-            raise OrderError("Hãy bấm Dừng trước khi sửa cài đặt.")
-        self._no_job()
+        """Lưu được cả lúc đang chạy: lượt cân kế tiếp dùng thông số mới."""
         s = dict(self.settings)
         for k, v in patch.items():
             if k not in config.SETTING_DEFAULTS:
@@ -627,21 +628,17 @@ class Engine:
             return
         self._sleep(1.5)
 
-        # 3) Đọc lại mã vừa in
-        self._msg("ĐANG ĐỌC MÃ VẠCH...", ORANGE)
+        # 3) Đọc lại mã vừa in (như bản cũ): chờ tới khi đầu đọc trả mã; mã sai thì đọc lần 2
         read = ""
-        tries = max(1, s["barcode_retries"])
-        for i in range(1, tries + 1):
-            self._check()
+        for i, text in ((1, "ĐANG ĐỌC MÃ VẠCH..."), (2, "ĐỌC MÃ LỖI - ĐANG THỬ ĐỌC LẠI LẦN 2...")):
             t0 = time.time()
-            read = self.dev.barcode.read(s["barcode_timeout_ms"], self._stop_evt)
+            read = self._read_code(text)
             match = read == code
             log.info("%s [BARCODE] lần %d: mong đợi '%s', nhận '%s' sau %d ms -> %s", tag, i,
                      code, read, (time.time() - t0) * 1000, "KHỚP" if match else "SAI")
             if match:
                 break
-            if i < tries:
-                self._msg("ĐỌC MÃ LỖI - ĐANG THỬ ĐỌC LẠI LẦN %d..." % (i + 1), ORANGE)
+            self._sleep(0.3)
         if read != code:
             self._ng(tag, parcel, "barcode", "KHÔNG ĐỌC ĐƯỢC MÃ VẠCH - BỎ RA KHỎI CÂN",
                      weight=final, read=read)
@@ -663,6 +660,19 @@ class Engine:
             self._begin_close(pallet_id)
             self._close_pallet(self.db.pallets.find_one({"pallet_id": pallet_id}))
         self._sleep(0.3)
+
+    def _read_code(self, text):
+        """Nghe đầu đọc tới khi có mã. Không có giới hạn thời gian: công nhân bấm Dừng để thoát."""
+        while True:
+            if self.dev.barcode.connected:
+                self._msg(text, ORANGE)
+                read = self.dev.barcode.read(BARCODE_RETRIGGER_MS, self._stop_evt)
+                if read:
+                    return read
+                self._check()
+            else:
+                self._msg("MẤT KẾT NỐI ĐẦU ĐỌC - KIỂM TRA CÁP PDA", RED)
+                self._sleep(1.0)
 
     def _ng(self, tag, parcel, why, text, weight=None, read=None, mark=True):
         """Thùng không đạt: đèn đỏ, đếm Sai. In/đọc lỗi thì giữ mã để in lại ở lượt sau."""
@@ -737,39 +747,12 @@ class Engine:
         self.current_code = ""
         log.info("Pallet %s đủ thùng -> chốt pallet", pallet_id)
 
-    def _hold(self, text):
-        """Lỗi chốt pallet: đèn đỏ và chờ công nhân bấm Dừng -> Bắt đầu để in/quét lại."""
-        self._msg(text, RED)
-        self._light("red")
-        log.warning("Chốt pallet dừng chờ: %s", text)
-        while True:
-            self._sleep(0.2)
-
     def _close_pallet(self, p):
         if p is None:
             return
         s, pid = self.settings, p["pallet_id"]
         if p["status"] == "FINALIZING":
-            if s["print_pallet"]:
-                self._msg("IN MÃ PALLET: " + pid, ORANGE)
-                self._sleep(s["pallet_print_delay_s"])
-                if not self.dev.printer.print_pallet(pid):
-                    log.error("In tem pallet %s lỗi", pid)
-                    self._hold("PALLET KHÔNG XỬ LÝ ĐƯỢC: " + pid)
-                log.info("[PRINTER] in tem pallet %s OK", pid)
-                matched = False
-                for i in range(1, 4):
-                    self._msg("ĐANG ĐỌC MÃ PALLET... (%d/3)" % i, ORANGE)
-                    read = self.dev.barcode.read(5000, self._stop_evt)
-                    self._check()
-                    matched = bool(read) and read.lower() == pid.lower()
-                    log.info("[BARCODE] tem pallet lần %d: mong đợi '%s', nhận '%s' -> %s", i, pid,
-                             read, "KHỚP" if matched else "SAI")
-                    if matched:
-                        break
-                    self._sleep(0.1)
-                if not matched:
-                    self._hold("LỖI ĐỌC MÃ PALLET")
+            # Như bản cũ: đủ thùng là chốt pallet và chờ ĐỊNH DANH, không in tem pallet.
             with self.lock:
                 self.db.parcels.update_many({"pallet_id": pid, "status": {"$gte": 1}},
                                             {"$set": {"status": 4}})
@@ -894,7 +877,7 @@ class Engine:
             raise OrderError("Đang in lại tem pallet. Chờ in xong hoặc bấm Dừng để hủy.")
 
     def reprint_pallet(self, pallet_id=""):
-        """In lại tem mọi thùng đã đạt của pallet (đang làm hoặc trong lịch sử) + tem pallet.
+        """In lại tem mọi thùng đã đạt của pallet (đang làm hoặc trong lịch sử).
 
         Chạy nền vì một pallet có thể vài chục tem; bấm Dừng là hủy. Thùng chưa cân/in đạt
         không được in ở đây để không có tem cho thùng chưa qua kiểm tra.
@@ -922,21 +905,20 @@ class Engine:
                         .limit(2000))
             if not rows:
                 raise OrderError("Pallet %s chưa có thùng nào đã in tem." % p["pallet_id"])
-            with_pallet = bool(self.settings["print_pallet"]) and p["status"] != "PROCESSING"
-            total = len(rows) + (1 if with_pallet else 0)
+            total = len(rows)
             self.job = {"pallet_id": p["pallet_id"], "done": 0, "total": total, "active": True,
                         "error": "", "cancelled": False}
             self._job_stop.clear()
             self._job_thread = threading.Thread(
-                target=self._reprint_job, args=(p, rows, with_pallet, col is self.db.parcels),
+                target=self._reprint_job, args=(p, rows, col is self.db.parcels),
                 name="reprint", daemon=True)
             self._job_thread.start()
-        log.warning("IN LẠI TOÀN BỘ TEM pallet %s (%s): %d tem thùng%s", p["pallet_id"], source,
-                    len(rows), " + 1 tem pallet" if with_pallet else "")
+        log.warning("IN LẠI TOÀN BỘ TEM pallet %s (%s): %d tem thùng", p["pallet_id"], source,
+                    len(rows))
         self.event("reprint_pallet", pallet_id=p["pallet_id"], cartons=len(rows), source=source)
         return {"pallet_id": p["pallet_id"], "total": total}
 
-    def _reprint_job(self, p, rows, with_pallet, live):
+    def _reprint_job(self, p, rows, live):
         job, pid, printer = self.job, p["pallet_id"], self.dev.printer
         try:
             for r in rows:
@@ -958,16 +940,6 @@ class Engine:
                     self.db.parcels.update_one({"_id": r["_id"]}, {"$inc": {"print_count": 1}})
                 job["done"] += 1
                 self._job_stop.wait(0.3)             # không dồn lệnh vào bộ đệm máy in
-            else:
-                if with_pallet:
-                    self._msg("ĐANG IN LẠI TEM PALLET %s: %d/%d" % (pid, job["total"],
-                                                                     job["total"]), ORANGE)
-                    ok = printer.print_pallet(pid)
-                    log.info("[REPRINT] tem pallet %s: %s", pid, "OK" if ok else "LỖI")
-                    if ok:
-                        job["done"] += 1
-                    else:
-                        job["error"] = "IN LỖI TEM PALLET " + pid
         except Exception as e:
             log.exception("In lại tem pallet %s lỗi", pid)
             job["error"] = "LỖI: %s" % e

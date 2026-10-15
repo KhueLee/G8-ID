@@ -375,7 +375,7 @@ def carton_ok(expect_done):
     wait(lambda: state()["message"].startswith(("CHỜ ĐẶT", "SẴN SÀNG")), 20, "trạm chờ thùng")
     place(300)
     wait(lambda: state()["carton"][0] >= expect_done or state()["message"].startswith(
-        ("ĐÃ HOÀN THÀNH PALLET", "PALLET OK", "IN MÃ PALLET", "ĐANG ĐỌC MÃ PALLET")), 30,
+        ("ĐÃ HOÀN THÀNH PALLET", "PALLET OK")), 30,
          "thùng thứ %d đạt" % expect_done)
     remove()
 
@@ -393,9 +393,12 @@ def e2e_tests(env):
         env.start_sim()
         wait(lambda: all(state()["dev"][k]["ok"] for k in ("plc", "printer", "scale", "barcode")),
              15, "4 thiết bị mô phỏng xanh")
-        r = http(APP + "/api/settings", {"time_scale": 1, "pallet_print_delay_s": 0,
-                                         "scale_value": 300, "scale_error": 50})[1]
+        r = http(APP + "/api/settings", {"time_scale": 1, "scale_value": 300,
+                                         "scale_error": 50})[1]
         assert r["ok"], r
+        for url in (APP + "/guide", SIMU + "/guide"):
+            with urllib.request.urlopen(url, timeout=5) as g:
+                assert g.status == 200 and g.read(5) == b"%PDF-", url
 
     def t_order_api():
         assert http(ORDER + "/ids/orderTask/", method="GET")[0] == 405
@@ -446,15 +449,15 @@ def e2e_tests(env):
         codes = [x["code"] for x in rows]
         assert len(codes) == 3, codes
         r = http(APP + "/api/reprint_pallet", {"pallet_id": pid})[1]
-        assert r["ok"] and r["total"] == 4, r
+        assert r["ok"] and r["total"] == 3, r
         j = wait(job_done, 20, "in lại xong")
-        assert (j["done"], j["error"], j["cancelled"]) == (4, "", False), j
-        assert state()["message"] == "ĐÃ IN LẠI 4 TEM CỦA PALLET " + pid, state()["message"]
-        labels = http(SIMU + "/sim/state")[1]["labels"][-4:]
-        assert [x["type"] for x in labels] == ["carton"] * 3 + ["pallet"], labels
-        assert [x["code"] for x in labels] == codes + [pid], labels
-        assert all(x["pallet"] == pid for x in labels[:3]), labels
-        assert [x["weight"] for x in labels[:3]] == [x["weight"] for x in rows], \
+        assert (j["done"], j["error"], j["cancelled"]) == (3, "", False), j
+        assert state()["message"] == "ĐÃ IN LẠI 3 TEM CỦA PALLET " + pid, state()["message"]
+        labels = http(SIMU + "/sim/state")[1]["labels"][-3:]
+        assert [x["type"] for x in labels] == ["carton"] * 3, labels
+        assert [x["code"] for x in labels] == codes, labels
+        assert all(x["pallet"] == pid for x in labels), labels
+        assert [x["weight"] for x in labels] == [x["weight"] for x in rows], \
             "tem in lại phải ghi đúng khối lượng đã cân: %s" % labels
         # Máy in lỗi giữa chừng: dừng lại và báo đúng thùng
         sim_set(printer_fail=True)
@@ -470,6 +473,9 @@ def e2e_tests(env):
     def t_ng_cases():
         order(1, 2)
         start()
+        # Lưu thông số ngay lúc đang chạy
+        r = http(APP + "/api/settings", {"scale_error": 50})[1]
+        assert r["ok"] and state()["running"], r
         # Sai khối lượng: NG, không tiêu mã
         wait(lambda: state()["message"].startswith(("CHỜ ĐẶT", "SẴN SÀNG")), 20, "chờ thùng")
         place(900)
@@ -489,7 +495,7 @@ def e2e_tests(env):
         sim_set(barcode_mode="wrong_once")
         carton_ok(1)
         assert state()["rows"][0]["st"] == 1
-        # Không đọc được: NG, giữ mã để in lại
+        # Đọc sai cả 2 lần: NG, giữ mã để in lại
         sim_set(barcode_mode="wrong")
         wait(lambda: state()["message"].startswith(("CHỜ ĐẶT", "SẴN SÀNG")), 20, "chờ thùng")
         place(300)
@@ -511,13 +517,17 @@ def e2e_tests(env):
         sim_set(barcode_mode="none")
         place(300)
         wait(lambda: state()["message"].startswith("ĐANG ĐỌC MÃ VẠCH"), 20, "đang đọc mã")
+        # Như bản cũ: không có mã thì nghe tiếp, không tự báo NG
+        time.sleep(6)
+        assert state()["message"].startswith("ĐANG ĐỌC MÃ VẠCH") and state()["big"] != "NG", \
+            (state()["message"], state()["big"])
         secs = stop()
         assert secs < 7, "Dừng mất %.1f s" % secs
         assert state()["big"] == "STOP" and state()["light"] == "off"
         sim_set(barcode_mode="ok")
         remove()
         print("         (Dừng giữa lúc đọc mã mất %.1f s)" % secs)
-        # Pallet đang làm dở (1/2 thùng đạt): chỉ in lại thùng đã đạt, chưa in tem pallet
+        # Pallet đang làm dở (1/2 thùng đạt): chỉ in lại thùng đã đạt
         done = [x["code"] for x in state()["rows"] if x["st"] >= 1]
         r = http(APP + "/api/reprint_pallet", {})[1]
         assert r["ok"] and r["total"] == 1 and len(done) == 1, (r, done)
@@ -656,8 +666,9 @@ def e2e_tests(env):
     check("Cổng nhận lệnh: 405 / Empty body / Invalid JSON / order_id invalid", t_order_api)
     check("Lệnh 2 pallet x 3 thùng: cân-in-đọc-định danh-lưu lịch sử", t_full_order)
     check("In lại toàn bộ tem pallet từ lịch sử; máy in lỗi giữa chừng", t_reprint_history)
-    check("NG: sai khối lượng / in lỗi / đọc lại lần 2 / không đọc được", t_ng_cases)
-    check("Mất tín hiệu cân tự hồi phục; Dừng không treo", t_scale_lost_and_stop)
+    check("NG: sai khối lượng / in lỗi / đọc lại lần 2 / đọc sai 2 lần", t_ng_cases)
+    check("Mất tín hiệu cân tự hồi phục; đầu đọc chờ tới khi có mã; Dừng không treo",
+          t_scale_lost_and_stop)
     check("Server lỗi: giữ pallet, tự gửi lại tới khi nhận", t_server_retry)
     check("Lệnh gửi lặp không nhân đôi; cancelTask hủy lệnh; confirm_product", t_cancel_and_duplicate)
     check("Mất điện giữa lệnh: khởi động lại còn nguyên tiến độ", t_power_loss)

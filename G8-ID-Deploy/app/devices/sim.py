@@ -137,9 +137,6 @@ class SimPrinter(_Polled):
                             "pallet": pallet_code, "wh_code": wh_code, "weight": weight_g,
                             "mfg_date": mfg_date})
 
-    def print_pallet(self, pallet_code):
-        return self._print({"type": "pallet", "code": pallet_code})
-
     def _print(self, body):
         try:
             body["time"] = time.strftime("%H:%M:%S")

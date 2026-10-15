@@ -31,6 +31,7 @@
   <button data-tab="settings">&#9881; Cài đặt</button>
   <button data-tab="info">&#9776; Thông số</button>
   <button data-tab="logs">&#10150; Lịch sử Log</button>
+  <a class="navlink" href="/guide" target="_blank">&#9432; Hướng dẫn</a>
 </nav>
 
 <main>
@@ -84,13 +85,9 @@
       <label>Khối lượng chuẩn (g)<input id="s-scale_value" type="number"></label>
       <label>Sai số cho phép (g)<input id="s-scale_error" type="number"></label>
       <label>Thời gian cân (s)<input id="s-time_scale" type="number"></label>
-      <label>Chờ trước khi in tem pallet (s)<input id="s-pallet_print_delay_s" type="number"></label>
-      <label class="chk"><input id="s-print_pallet" type="checkbox"> In + quét mã pallet</label>
       <label class="chk"><input id="s-confirm_new_order" type="checkbox"> Hỏi Yes/No khi có lệnh mới</label>
       <label class="chk"><input id="s-auto_start_on_order" type="checkbox"> Có lệnh mới thì tự Bắt đầu</label>
       <label>Gửi pallet về server<select id="s-pallet_done_trigger"><option value="button">Bấm nút ĐỊNH DANH</option><option value="auto">Tự động khi chốt pallet</option></select></label>
-      <label>Số lần đọc mã vạch<input id="s-barcode_retries" type="number"></label>
-      <label>Thời gian chờ đọc mã (ms)<input id="s-barcode_timeout_ms" type="number"></label>
       <h4>Vị trí sàn</h4>
       <div class="grid3"><input id="s-pos0"><input id="s-pos1"><input id="s-pos2"><input id="s-pos3"><input id="s-pos4"><input id="s-pos5"></div>
       <button class="b ok" onclick="saveSettings()">OK - Lưu thông số</button>
@@ -123,7 +120,7 @@
       <button class="b" onclick="act('/api/print_manual',{text:val('m-print')},'IN THÀNH CÔNG')">In thử</button>
       <button class="b" onclick="act('/api/reprint',{},'Đã in lại tem')">In lại tem thùng gần nhất</button>
       <button class="b warn" onclick="reprintPallet('')">In lại toàn bộ tem pallet đang làm</button>
-      <p class="hint">In lại tem của mọi thùng đã đạt + tem pallet (nếu pallet đã chốt). Pallet đã xong: thẻ Thông số → Lịch sử pallet → “In lại tem”. Bấm Dừng để hủy giữa chừng.</p>
+      <p class="hint">In lại tem của mọi thùng đã đạt trong pallet. Pallet đã xong: thẻ Thông số → Lịch sử pallet → “In lại tem”. Bấm Dừng để hủy giữa chừng.</p>
       <h4>Đổi mật khẩu</h4>
       <label>Mật khẩu mới<input id="m-pass" type="password"></label>
       <button class="b" onclick="changePass()">Đổi mật khẩu</button>

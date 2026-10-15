@@ -171,7 +171,7 @@ def build():
     s += [P("A1. Mở phần mềm", h2)]
     s += steps([
         "Nhấp đúp biểu tượng <b>Chạy phần mềm</b> trên Desktop.",
-        "Một cửa sổ đen hiện ra, tiêu đề <i>\u201cG8 ID - Phan mem dinh danh (KHONG DONG CUA SO NAY)\u201d</i>. "
+        "Một cửa sổ đen hiện ra, dòng đầu màu xanh lá ghi <b>PHẦN MỀM ĐỊNH DANH SẢN PHẨM</b>. "
         "Bấm nút <b>_</b> để thu nhỏ, <b>không bấm X</b>.",
         "Sau vài giây Chrome tự mở màn hình định danh (địa chỉ <b>http://127.0.0.1:8600</b>).",
         "Chờ các chỉ báo trên thanh đầu chuyển <font color='#1e8a1e'><b>chữ xanh</b></font> "
@@ -208,7 +208,7 @@ def build():
                      "<b>Bắt đầu</b> và <b>Dừng</b>."],
         ["Các thẻ", "<b>Trang chủ</b> · <b>Cài đặt</b> (cần mật khẩu, mặc định 1234) · "
                     "<b>Thông số</b> (trạng thái, lịch sử pallet, in lại tem) · "
-                    "<b>Lịch sử Log</b>."],
+                    "<b>Lịch sử Log</b> · <b>Hướng dẫn</b> (mở tài liệu này)."],
     ], [26, 148])
 
     s += [CondPageBreak(80 * mm), P("A3. Quy trình sản xuất một lệnh (chế độ AUTO)", h2)]
@@ -220,9 +220,7 @@ def build():
         "đầu đọc → <b>ĐANG ĐỌC MÃ VẠCH...</b>",
         "Thùng đạt: ô lớn <font color='#1e8a1e'><b>OK</b></font>, đèn xanh. Lấy thùng ra khỏi cân; "
         "khi thấy <b>SẴN SÀNG CHO SẢN PHẨM MỚI</b> thì đặt thùng tiếp theo.",
-        "Đủ thùng của pallet: máy in tem pallet (<b>IN MÃ PALLET</b>) và tự quét lại "
-        "(<b>ĐANG ĐỌC MÃ PALLET... 1/3</b>). Dán tem pallet cho đầu đọc đọc được.",
-        "Thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "
+        "Đủ thùng của pallet: thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "
         "<b>Định danh</b> trên thanh đầu, chọn <b>Yes</b> để gửi pallet lên server.",
         "Thấy <b>PALLET OK – TIẾP TỤC SẢN XUẤT</b> → làm pallet tiếp theo. Hết lệnh: "
         "<b>ĐÃ HOÀN TẤT LỆNH SẢN XUẤT</b>, trạm tự về STOP.",
@@ -235,14 +233,18 @@ def build():
          "Sai khối lượng. Bỏ thùng ra, kiểm tra hàng. Đặt lại – máy cân lại cho đúng mã đó."],
         ["IN TEM THẤT BẠI, VUI LÒNG BỎ RA KHỎI CÂN",
          "Kiểm tra máy in (giấy, ribbon, nắp). Bỏ thùng ra rồi đặt lại – máy in lại đúng mã đó."],
+        ["ĐANG ĐỌC MÃ VẠCH... (đứng mãi)",
+         "Đầu đọc chưa thấy tem – máy <b>chờ tới khi đọc được</b>, không tự báo lỗi. Chỉnh tem vào "
+         "tầm đầu đọc. Tem hỏng: bấm <b>Dừng</b>, bỏ thùng ra, bấm <b>Bắt đầu</b> và đặt lại – "
+         "máy in tem mới."],
         ["KHÔNG ĐỌC ĐƯỢC MÃ VẠCH - BỎ RA KHỎI CÂN",
-         "Tem nhăn / sai vị trí / đầu đọc lệch. Bỏ thùng ra, đặt lại – máy in tem mới và đọc lại."],
+         "Đầu đọc đọc ra mã <b>khác</b> mã vừa in cả 2 lần (tem cũ / tem thùng khác lọt vào tầm "
+         "đọc). Bỏ thùng ra, gỡ tem sai, đặt lại – máy in tem mới."],
+        ["MẤT KẾT NỐI ĐẦU ĐỌC - KIỂM TRA CÁP PDA",
+         "Kiểm tra cáp / nguồn đầu đọc. Nối lại được thì máy tự đọc tiếp."],
         ["VUI LÒNG LẤY HÀNG RA KHỎI CÂN", "Thùng cũ còn trên cân. Lấy ra hẳn để cân về 0."],
         ["MẤT TÍN HIỆU CÂN - KIỂM TRA KẾT NỐI CÂN",
          "Kiểm tra nguồn và cáp của cân. Máy tự nối lại khi có tín hiệu."],
-        ["PALLET KHÔNG XỬ LÝ ĐƯỢC / LỖI ĐỌC MÃ PALLET",
-         "In hoặc quét tem pallet lỗi. Xử lý máy in / tem, bấm <b>Dừng</b> rồi <b>Bắt đầu</b> "
-         "để máy in và quét lại."],
         ["ĐANG CHỜ GỬI PALLET VỀ SERVER",
          "Server chưa nhận (chỉ báo RCS đỏ). Máy tự gửi lại mỗi 30 giây; nếu kéo dài, báo bộ phận "
          "IT / WMS kiểm tra mạng và server."],
@@ -286,6 +288,33 @@ def build():
                 "Tắt máy bình thường. (Bấm X cửa sổ đen hoặc tắt máy khi phần mềm đang mở cũng "
                 "không hỏng dữ liệu, nhưng nên Dừng trước.)"])
 
+    s += [CondPageBreak(90 * mm), P("A8. Thông số trong thẻ Cài đặt", h2),
+          P("Sửa rồi bấm <b>OK - Lưu thông số</b> là lưu ngay vào máy trạm, kể cả khi đang chạy "
+            "(áp dụng từ thùng tiếp theo). Cập nhật phần mềm (git pull) không đụng tới các thông "
+            "số này.")]
+    s += table([
+        ["Thông số", "Mặc định", "Ý nghĩa"],
+        ["Khối lượng chuẩn (g)", "300",
+         "Khối lượng đúng của một thùng. <b>Lệnh từ WCS có Weight_ref thì dùng Weight_ref</b>; "
+         "chỉ khi lệnh không gửi (hoặc gửi 0) mới dùng số này. Dòng <i>Cân nặng</i> ở Trang chủ "
+         "hiện số đang dùng."],
+        ["Sai số cho phép (g)", "100",
+         "Chỉ cấu hình ở đây (WCS không gửi), áp cho mọi lệnh. Thùng đạt khi khối lượng nằm "
+         "trong <i>chuẩn ± sai số</i>."],
+        ["Thời gian cân (s)", "2",
+         "Cân phải đứng yên liên tục chừng này giây (2 lần đọc liền nhau lệch không quá 15 g) "
+         "mới chốt khối lượng và so với chuẩn. Tránh chốt lúc thùng đang lắc."],
+        ["Hỏi Yes/No khi có lệnh mới", "Tắt", "Bật thì có lệnh mới phải bấm Yes mới nhận."],
+        ["Có lệnh mới thì tự Bắt đầu", "Bật", "Lệnh mới về khi trạm đang STOP thì tự chạy."],
+        ["Gửi pallet về server", "Bấm nút ĐỊNH DANH",
+         "<i>Tự động khi chốt pallet</i>: đủ thùng là tự gửi, không cần bấm Định danh."],
+        ["Vị trí sàn (6 ô)", "S01.120.01 …",
+         "Gõ tay tên các vị trí đặt pallet trên sàn. Vị trí của từng pallet do <b>WCS gửi trong "
+         "lệnh</b> (Location, hiện ở dòng <i>Vị trí</i>). 3 ô đầu hiện thành VỊ TRÍ 01–03 ở Trang "
+         "chủ; ô trùng với Location của pallet đang làm sẽ hiện tên để công nhân biết đặt pallet "
+         "ở đâu. Ô 4–6 chỉ để lưu (giống bản cũ)."],
+    ], [42, 26, 106])
+
     # ------------------------------------------------------------------ PHẦN B
     s += [PageBreak()]
     s += section("PHẦN B – CHẠY MÔ PHỎNG", AMBER)
@@ -295,7 +324,8 @@ def build():
     s += steps([
         "Mở <b>Chạy phần mềm</b> trước (Phần A1).",
         "Đổi sang <b>MANUAL</b> hoặc <b>HYBRID</b> (mục A6). Màn hình chính hiện dải vàng.",
-        "Nhấp đúp <b>Chạy mô phỏng</b>. Một cửa sổ đen thứ hai mở ra (để nguyên, thu nhỏ) và "
+        "Nhấp đúp <b>Chạy mô phỏng</b>. Một cửa sổ đen thứ hai mở ra, dòng đầu màu xanh lá ghi "
+        "<b>PHẦN MỀM MÔ PHỎNG ĐỊNH DANH</b> (để nguyên, thu nhỏ) và "
         "trình duyệt mở công cụ mô phỏng tại <b>http://127.0.0.1:8700</b>.",
         "Góc phải trên công cụ hiện <b>Phần mềm chính: MANUAL · STOP</b> (hoặc HYBRID) trên nền "
         "xanh là đã nối đúng.",
@@ -309,7 +339,8 @@ def build():
         ["Ô", "Dùng để", "MANUAL", "HYBRID"],
         ["Cân điện tử", "Đặt thùng / đặt thùng SAI khối lượng / nhấc thùng; tắt cân để thử mất tín hiệu.",
          "Có", "Mờ (dùng cân thật)"],
-        ["Đầu đọc mã vạch", "Chọn kết quả đọc: đúng, sai 1 lần, luôn sai, không đọc được.",
+        ["Đầu đọc mã vạch", "Chọn kết quả đọc: đúng, sai 1 lần, luôn sai, không đọc được "
+         "(máy chính đứng chờ ở ĐANG ĐỌC MÃ VẠCH).",
          "Có", "Mờ"],
         ["Máy in tem", "Xem các tem \u201cđã in\u201d; giả lập in lỗi.", "Có", "Mờ"],
         ["PLC / đèn tháp", "Xem màu đèn phần mềm đang bật.", "Có", "Mờ"],

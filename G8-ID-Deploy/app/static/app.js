@@ -138,7 +138,7 @@ async function openTab(name) {
 }
 
 // ---------- cài đặt ----------
-const S_NUM = ['scale_value', 'scale_error', 'time_scale', 'pallet_print_delay_s', 'barcode_retries', 'barcode_timeout_ms'];
+const S_NUM = ['scale_value', 'scale_error', 'time_scale'];
 const D_FIELDS = { scale: ['port', 'baudrate'], barcode: ['port', 'baudrate'], printer: ['connect_type', 'usb_name', 'com_port', 'lan_ip', 'driver_name'], plc: ['enabled', 'station_number'] };
 async function loadSettings() {
   const r = await api('/api/settings');
@@ -146,7 +146,7 @@ async function loadSettings() {
   const s = r.settings;
   $('s-mode').textContent = r.mode;
   S_NUM.forEach(k => $('s-' + k).value = s[k]);
-  $('s-print_pallet').checked = s.print_pallet; $('s-confirm_new_order').checked = s.confirm_new_order;
+  $('s-confirm_new_order').checked = s.confirm_new_order;
   $('s-auto_start_on_order').checked = s.auto_start_on_order;
   $('s-pallet_done_trigger').value = s.pallet_done_trigger;
   for (let i = 0; i < 6; i++) $('s-pos' + i).value = s.positions[i] || '';
@@ -161,7 +161,7 @@ async function act(path, body, okText) {
   return r.ok;
 }
 async function saveSettings() {
-  const b = { print_pallet: $('s-print_pallet').checked, confirm_new_order: $('s-confirm_new_order').checked, auto_start_on_order: $('s-auto_start_on_order').checked, pallet_done_trigger: val('s-pallet_done_trigger'), positions: [] };
+  const b = { confirm_new_order: $('s-confirm_new_order').checked, auto_start_on_order: $('s-auto_start_on_order').checked, pallet_done_trigger: val('s-pallet_done_trigger'), positions: [] };
   S_NUM.forEach(k => b[k] = Number(val('s-' + k)));
   for (let i = 0; i < 6; i++) b.positions.push(val('s-pos' + i));
   await act('/api/settings', b, 'Đã lưu thông số.');
@@ -195,7 +195,7 @@ async function loadInfo() {
   const r = await api('/api/info'), s = r.settings;
   kv('i-station', [['Mã trạm', r.station], ['Phiên bản', r.version], ['Chế độ', r.mode], ['Đã chạy', r.uptime_min + ' phút'],
     ['Khối lượng chuẩn', s.scale_value + ' g (dùng khi lệnh không gửi Weight_ref)'], ['Sai số', '± ' + s.scale_error + ' g'], ['Thời gian cân', s.time_scale + ' s'],
-    ['In mã pallet', s.print_pallet ? 'Có' : 'Không'], ['Gửi pallet', s.pallet_done_trigger === 'auto' ? 'Tự động' : 'Bấm nút ĐỊNH DANH'], ['Vị trí sàn', s.positions.join(', ')]]);
+    ['Gửi pallet', s.pallet_done_trigger === 'auto' ? 'Tự động' : 'Bấm nút ĐỊNH DANH'], ['Vị trí sàn', s.positions.join(', ')]]);
   kv('i-dev', [...['plc', 'printer', 'scale', 'barcode'].map(k => [k.toUpperCase(), (r.devices[k].ok ? 'ĐÃ KẾT NỐI' : 'MẤT KẾT NỐI') + ' — ' + r.devices[k].detail]),
     ['Cổng nhận lệnh', r.order_port + '  (/ids/orderTask/, /ids/cancelTask/, /ids/confirm_product/)'], ['Server nhận pallet', r.pallet_done_url],
     ['Lần gửi gần nhất', r.rcs === null ? 'chưa gửi' : r.rcs ? 'thành công' : 'LỖI: ' + r.rcs_error], ['Thư mục log', r.log_dir]]);

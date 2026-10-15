@@ -62,6 +62,10 @@ def build_ui(engine, on_quit):
     def index():
         return send_from_directory(STATIC, "index.html")
 
+    @app.get("/guide")
+    def guide():
+        return send_from_directory(config.BASE_DIR, config.GUIDE_PDF)
+
     @app.get("/static/<path:name>")
     def static_file(name):
         return send_from_directory(STATIC, name)

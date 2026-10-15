@@ -26,7 +26,6 @@ WMS/WCS                     Trạm                                  identify-ser
    |------------------------->|  200 {1000, SUCCESS}                     |
    |<-------------------------|                                          |
    |                          |  cân – in tem – đọc mã từng thùng        |
-   |                          |  đủ thùng → (in + quét tem pallet)       |
    |                          |  công nhân bấm ĐỊNH DANH                 |
    |                          |  IF-03 pallet_identify_done ------------>|
    |                          |<----------------------------- HTTP 2xx   |
@@ -99,7 +98,7 @@ sau.
 
 | Trường | Kiểu | Bắt buộc | Ý nghĩa / trạm dùng để |
 |---|---|---|---|
-| `Pallet_ID` | chuỗi (`PalletId`) | có | Mã pallet; in trên tem; QR tem pallet; `palletID` của IF-03 |
+| `Pallet_ID` | chuỗi (`PalletId`) | có | Mã pallet; in trên tem thùng; `palletID` của IF-03 |
 | `Carton_List` | mảng chuỗi (`CartonList`) | có, ≥ 1 | Mỗi chuỗi là một thùng (quy tắc tách mã bên dưới) |
 | `Location` | chuỗi | | Vị trí sàn của pallet, hiện trên màn hình |
 | `Item_Code` / `Item_Name` | chuỗi | | Tên sản phẩm trên màn hình và tem (ưu tiên `Item_Name`) |
@@ -190,9 +189,8 @@ header `Content-Type: application/json; charset=utf-8`, body UTF-8 (tiếng Vi�
 | `palletID` | `Pallet_ID` |
 | `Ctn` | Số thùng của pallet đã cân – in đạt |
 
-- **Thời điểm:** mọi thùng của pallet đã đạt và tem pallet đã quét khớp (nếu bật *In + quét tem
-  pallet*), sau đó công nhân bấm **ĐỊNH DANH** (mặc định) hoặc gửi tự động (cài đặt
-  *Gửi pallet về server = Tự động*). Mỗi pallet gửi một bản tin.
+- **Thời điểm:** mọi thùng của pallet đã đạt, sau đó công nhân bấm **ĐỊNH DANH** (mặc định)
+  hoặc gửi tự động (cài đặt *Gửi pallet về server = Tự động*). Mỗi pallet gửi một bản tin.
 - **Thành công:** HTTP 2xx trong 10 s (`servers.timeout_s`). **Nội dung body phản hồi không được
   kiểm tra.** Pallet chuyển sang lịch sử `DONE`, trạm làm pallet kế tiếp.
 - **Lỗi** (timeout, không kết nối được, HTTP khác 2xx): pallet giữ trạng thái chờ gửi, dây chuyền

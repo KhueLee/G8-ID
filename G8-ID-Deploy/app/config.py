@@ -43,15 +43,11 @@ SETTING_DEFAULTS = {
     "scale_value": 300,          # khối lượng chuẩn (g) - dùng khi lệnh không gửi Weight_ref
     "scale_error": 100,          # sai số cho phép (g)
     "time_scale": 2,             # thời gian cân ổn định (s)
-    "print_pallet": True,        # in + quét tem pallet khi đủ thùng
-    "pallet_print_delay_s": 10,  # chờ trước khi in tem pallet (bản cũ: Sleep 10 s)
     "positions": ["S01.120.01", "S01.121.01", "S01.122.01",
                   "S01.123.01", "S01.124.01", "S01.125.01"],
     "pallet_done_trigger": "button",  # button = bấm ĐỊNH DANH (như bản cũ) | auto = tự gửi
     "confirm_new_order": False,       # hỏi Yes/No khi có lệnh mới
     "auto_start_on_order": True,      # lệnh mới nạp xong mà trạm đang STOP thì tự bấm Bắt đầu
-    "barcode_timeout_ms": 5000,
-    "barcode_retries": 2,
     "zero_threshold_g": 20,
     "stable_jitter_g": 15,
 }
@@ -104,3 +100,4 @@ def path(*parts):
 DATA_DIR = os.environ.get("G8ID_DATA") or os.path.join(BASE_DIR, "data")
 MODE_FILE = os.path.join(DATA_DIR, "mode.json")
 SIM_BAT_LOCK = os.path.join(DATA_DIR, "simulator_bat.lock")
+GUIDE_PDF = "HUONG_DAN_VAN_HANH.pdf"       # nút Hướng dẫn trên màn hình chính và công cụ mô phỏng

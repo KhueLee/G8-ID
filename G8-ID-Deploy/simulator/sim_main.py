@@ -77,6 +77,11 @@ def index():
     return send_from_directory(os.path.join(HERE, "static"), "index.html")
 
 
+@app.get("/guide")
+def guide():
+    return send_from_directory(config.BASE_DIR, config.GUIDE_PDF)
+
+
 # ------------------------------------------------------------------ thiết bị giả
 @app.get("/dev/scale")
 def dev_scale():
@@ -267,7 +272,7 @@ def auto_worker():
         elif fake_scale and S["weight"] > 0 and time.time() - placed_at > 1.0 and (
                 st.get("big") in ("OK", "NG") and not msg.startswith(("CÂN", "ĐANG IN", "ĐANG ĐỌC",
                                                                       "ĐỌC MÃ LỖI"))
-                or msg.startswith(("IN MÃ PALLET", "VUI LÒNG", "ĐÃ HOÀN THÀNH", "PALLET"))):
+                or msg.startswith(("VUI LÒNG", "ĐÃ HOÀN THÀNH", "PALLET"))):
             S["weight"] = 0
             note("[AUTO] Nhấc thùng ra")
         if S["auto_identify"] and st.get("can_identify") and msg.startswith("ĐÃ HOÀN THÀNH PALLET"):

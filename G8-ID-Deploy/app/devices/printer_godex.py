@@ -176,22 +176,5 @@ class GodexPrinter:
                 self._close()
                 return False
 
-    def print_pallet(self, pallet_code):
-        with self._lock:
-            if not self._open:
-                return False
-            try:
-                dll = self._dll
-                self._begin(dll)
-                code = str(pallet_code).encode("mbcs")
-                dll.Bar_QRcode(100, 20, 2, 1, b"L", 0, 10, len(code), 0, code)
-                dll.sendcommand(b"E")
-                return True
-            except Exception as e:
-                self._error = f"lỗi in: {e}"
-                log.exception("In tem pallet lỗi - sẽ kết nối lại máy in")
-                self._close()
-                return False
-
     def status(self):
         return {"ok": self._open, "detail": self._error or str(self.cfg.get("connect_type"))}

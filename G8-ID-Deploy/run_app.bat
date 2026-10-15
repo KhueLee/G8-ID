@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title G8 ID - Phan mem dinh danh (KHONG DONG CUA SO NAY)
+title PHAN MEM DINH DANH - G8 ID (KHONG DONG CUA SO NAY)
 cd /d "%~dp0"
 set PYTHONUTF8=1
 set PYTHONUNBUFFERED=1
@@ -18,6 +18,7 @@ if errorlevel 1 (
 )
 
 :loop
+python tools\banner.py app
 python -m app.main
 set RC=%errorlevel%
 if %RC%==0 goto end
