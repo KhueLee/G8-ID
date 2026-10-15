@@ -158,6 +158,9 @@ dịch vụ `sermouse` (có lệnh hoàn tác trong file). Driver gốc: `driver
 
 ## 7. Giao tiếp với hệ thống khác
 
+Đặc tả đầy đủ (trường, mã lỗi, gửi lại, điểm cần xác nhận) cho đối tác WMS / WCS / RCS:
+[DOCKING_PROTOCOL.md](DOCKING_PROTOCOL.md).
+
 | | |
 |---|---|
 | Nhận lệnh | `POST http://<IP trạm>:8500/ids/orderTask/` → `1000 SUCCESS` / `1001 <lý do>` |
