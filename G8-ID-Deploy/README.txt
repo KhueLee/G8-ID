@@ -24,7 +24,10 @@ bố cục màn hình và driver thiết bị của bản cũ; giao diện chạ
  6) Chạy check_env.bat và xử lý các dòng [LỖI].
  7) Tắt hẳn VTP_Induction.exe cũ (hai phần mềm không dùng chung được cổng 8500
     và cổng COM).
- 8) Muốn tự chạy khi đăng nhập Windows: tạo shortcut của run_app.bat trong
+ 8) Đầu đọc mới / chưa cài: khi G8 ID đang tắt, chạy tools\scanner_timeout.bat một
+    lần. Nó gửi lệnh Honeywell của bản cũ TRGSTO300000. (thời gian tự tắt quét
+    300 s, lưu vào đầu đọc) rồi TRGSTO?. để đọc lại; cả hai dòng phải báo [OK].
+ 9) Muốn tự chạy khi đăng nhập Windows: tạo shortcut của run_app.bat trong
     shell:startup.
 
 MongoDB KHÔNG CẦN CÀI: mongodb\bin\mongod.exe (bản 4.4, chạy được cả trên CPU không
