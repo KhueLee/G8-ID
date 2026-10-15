@@ -252,6 +252,28 @@ def t_plc_mx():
         p.stop()
         plc_mx.MxPlc._create = real
 
+    # Kiểu comtypes (ActUtlType64 thật): GetDevice(dev) trả (lData, mã lỗi).
+    class FakeCt(FakeAct):
+        def GetDevice(self, dev):
+            return (0, 0x0180840B) if FakeAct.dead else (1, 0)
+
+    def create_ct(self):
+        self._ct = True
+        return FakeCt(), "control giả comtypes"
+
+    FakeAct.opens, FakeAct.dead = 1, False
+    plc_mx.MxPlc._create = create_ct
+    p = plc_mx.MxPlc({"enabled": True, "station_number": 0, "keepalive_s": 0.2})
+    try:
+        p.start()
+        wait(lambda: p.connected, 3, "PLC nối (comtypes)")
+        FakeAct.dead = True
+        wait(lambda: not p.connected, 3, "comtypes: GetDevice lỗi -> báo mất kết nối")
+        assert "0x0180840B" in p.status()["detail"], p.status()
+    finally:
+        p.stop()
+        plc_mx.MxPlc._create = real
+
 
 # ---------------------------------------------------------------- môi trường thử
 class Env:

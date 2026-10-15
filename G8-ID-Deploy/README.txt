@@ -173,13 +173,13 @@ ActUtlType64 là chương trình COM riêng (ActUtlType64.exe) nên dùng đư�
 và trong device-*.log, ví dụ:
    Open lỗi 0xF0000002 (không đọc được Logical Station ...)
 
-CHƯA THỬ VỚI MX COMPONENT THẬT (máy dựng không có): bài kiểm tra tự động chạy driver
-với một control giả có cùng các hàm, nên mới xác nhận được trình tự gọi, chưa xác
-nhận truyền thông. Hai điểm lấy ngoài sổ tay: mã CLSID của ActUtlType64 (lấy từ thư
-viện kiểu của MX Component 5, trùng với GUID trong MitsubishiPLC.dll bản cũ) và cách
-pywin32 trả giá trị của GetDevice. Nếu GetDevice không gọi được theo kiểu đó, phần
-mềm tự tắt bước dò kết nối và ghi một dòng cảnh báo; đèn tháp vẫn chạy. Lần đầu ở
-hiện trường hãy gửi lại device-*.log.
+ActUtlType64 KHÔNG CÓ IDispatch nên không gọi được bằng win32com.client.Dispatch
+(báo "No such interface supported"). Driver gọi qua thư viện comtypes với interface
+IActUtlType64 lấy từ thư viện kiểu nhúng trong ActUtlType64.exe (đường dẫn đọc từ
+registry). Đã thử ở trạm: Open()/Close() trả 0 với Logical Station 0. Chưa thử ở
+trạm: SetDevice bật đèn và GetDevice dò kết nối (comtypes trả (lData, mã lỗi)). Nếu
+GetDevice không gọi được theo kiểu đó, phần mềm tự tắt bước dò kết nối và ghi một
+dòng cảnh báo; đèn tháp vẫn chạy. Hãy gửi lại device-*.log sau lần chạy đầu.
 
 
 -------------------------------------------------------------------------------

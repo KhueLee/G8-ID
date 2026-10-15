@@ -14,6 +14,10 @@ Viết theo "MX Component Version 5 Reference Manual" (SH-082395ENG):
 
 ActUtlType64 là máy chủ COM ngoài tiến trình (ActUtlType64.exe) nên tạo theo CLSID; Python
 32-bit trên máy chỉ có MX Component 4 thì rơi về ActUtlType.ActUtlType (DLL 32-bit).
+ActUtlType64 không có IDispatch (win32com.client.Dispatch báo E_NOINTERFACE - đã gặp ở trạm),
+chỉ có interface vtable IActUtlType64 khai báo trong thư viện kiểu nhúng ở ActUtlType64.exe
+-> gọi qua comtypes. Với comtypes, tham số [out] thành giá trị trả về: GetDevice(dev) trả
+(lData, mã lỗi), các hàm khác trả thẳng mã lỗi.
 
 Đèn tháp (CPLC.SetTrafficLightByM): M0 = đỏ, M1 = xanh, M2 = vàng, M10 = tắt.
 """
@@ -66,6 +70,20 @@ class MxError(RuntimeError):
         self.rc = rc & 0xFFFFFFFF
 
 
+def _mx5_server_path():
+    """Đường dẫn ActUtlType64.exe (chứa thư viện kiểu). Bộ cài MX5 ghi CLSID ở nhánh 32-bit."""
+    import winreg
+    key = r"CLSID\%s\LocalServer32" % CLSID_ACTUTLTYPE64
+    for view in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
+        try:
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, key, 0, winreg.KEY_READ | view) as k:
+                cmd = winreg.QueryValueEx(k, "")[0].strip()
+        except OSError:
+            continue
+        return cmd[1:].split('"', 1)[0] if cmd.startswith('"') else cmd.split(" /", 1)[0]
+    return None
+
+
 def _rc(result):
     """Giá trị trả về của hàm MX. pywin32 trả (mã, dữ liệu) với hàm có tham số ra."""
     if isinstance(result, tuple):
@@ -85,6 +103,7 @@ class MxPlc:
         self._thread = None
         self._ok = False
         self._via = ""
+        self._ct = False                        # control tạo bằng comtypes (không phải pywin32)
         self._error = "chưa kết nối" if cfg.get("enabled", True) else "không dùng"
         self._keepalive = float(cfg.get("keepalive_s", 5) or 0)
 
@@ -114,23 +133,31 @@ class MxPlc:
 
     # ---- các bước gọi MX Component (chỉ chạy trong luồng "plc") ----------------
     def _create(self):
-        """Tạo control. Trả (đối tượng, tên) hoặc ném lỗi nếu máy chưa cài MX Component."""
-        import pythoncom
+        """Tạo control. Trả (đối tượng, tên) hoặc ném lỗi kèm lý do từng cách đã thử."""
         import win32com.client
+        self._ct = False
         if self.cfg.get("progid"):
             return win32com.client.Dispatch(self.cfg["progid"]), self.cfg["progid"]
         errors = []
         try:
-            return (win32com.client.Dispatch(CLSID_ACTUTLTYPE64,
-                                             clsctx=pythoncom.CLSCTX_LOCAL_SERVER),
-                    "ActUtlType64 (MX Component 5)")
+            import comtypes
+            import comtypes.client
+            exe = _mx5_server_path()
+            if not exe:
+                raise RuntimeError("không thấy trong registry")
+            mod = comtypes.client.GetModule(exe)
+            plc = comtypes.client.CreateObject(comtypes.GUID(CLSID_ACTUTLTYPE64),
+                                               clsctx=comtypes.CLSCTX_LOCAL_SERVER,
+                                               interface=mod.IActUtlType64)
+            self._ct = True
+            return plc, "ActUtlType64 (MX Component 5)"
         except Exception as e:
             errors.append("ActUtlType64: %s" % e)
         try:
             return win32com.client.Dispatch(PROGID_ACTUTLTYPE32), "ActUtlType (32-bit)"
         except Exception as e:
             errors.append("ActUtlType: %s" % e)
-        raise RuntimeError("chưa cài MX Component (%s)" % "; ".join(errors))
+        raise RuntimeError("không tạo được control MX Component (%s)" % "; ".join(errors))
 
     def _open(self):
         plc, via = self._create()
@@ -172,10 +199,14 @@ class MxPlc:
     def _probe(self, plc):
         """Đọc thử M10 để biết đường truyền còn sống (rút cáp PLC thì chỉ báo PLC phải đỏ)."""
         try:
-            rc, _ = _rc(plc.GetDevice("M10", 0))
+            if self._ct:
+                res = plc.GetDevice("M10")       # comtypes: (lData, mã lỗi)
+                rc = int(res[-1] if isinstance(res, (tuple, list)) else res)
+            else:
+                rc, _ = _rc(plc.GetDevice("M10", 0))
         except Exception as e:
             hr = getattr(e, "hresult", None)
-            if hr is not None and hr & 0xFFFFFFFF in _CALL_SHAPE_HRESULTS:
+            if isinstance(e, TypeError) or (hr is not None and hr & 0xFFFFFFFF in _CALL_SHAPE_HRESULTS):
                 self._keepalive = 0
                 log.warning("PLC: không gọi được GetDevice kiểu này (%s) - tắt dò kết nối định kỳ, "
                             "đèn tháp vẫn hoạt động", e)
@@ -235,6 +266,7 @@ class MxPlc:
                     log.info("Đã đóng kết nối PLC")
                 except Exception as e:
                     log.warning("Lỗi đóng PLC: %s", e)
+            plc = None                           # nhả con trỏ COM trước khi CoUninitialize
             self._ok = False
             pythoncom.CoUninitialize()
 

@@ -42,12 +42,12 @@ def main():
     out("OK" if sys.version_info >= (3, 10) else "LỖI",
         "Python %s (%d-bit) tại %s" % (sys.version.split()[0], bits, sys.executable))
 
-    for mod in ("pymongo", "serial", "flask", "waitress", "win32com.client"):
+    for mod in ("pymongo", "serial", "flask", "waitress", "win32com.client", "comtypes"):
         try:
             importlib.import_module(mod)
             out("OK", "Thư viện %s" % mod)
         except Exception as e:
-            out("CẢNH BÁO" if mod.startswith("win32com") else "LỖI",
+            out("CẢNH BÁO" if mod in ("win32com.client", "comtypes") else "LỖI",
                 "Thiếu thư viện %s (%s) -> chạy install.bat" % (mod, e))
 
     from app import config
