@@ -89,6 +89,7 @@ git stash pop
 |---|---|
 | `run_app.bat` | Chạy phần mềm + mở Chrome. Chết bất thường thì tự chạy lại sau 3 s. |
 | `run_simulator.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL** / **HYBRID**. |
+| `HUONG_DAN_VAN_HANH.pdf` | Hướng dẫn kỹ thuật vận hành: biểu tượng *Chạy phần mềm* (`run_app.bat`) và *Chạy mô phỏng* (`run_simulator.bat`). Nguồn: `docs\huong_dan_van_hanh.py`. |
 | `check_env.bat` | Kiểm tra máy (Python, thư viện, COM, máy in, MX Component, firewall) → `logs\check_env.txt`. |
 | `run_tests.bat` | 20 bài kiểm tra tự động (~2 phút), chạy được ngay trên máy trạm. |
 | `install.bat` | Cài thư viện Python. |
