@@ -90,10 +90,11 @@ git stash pop
 | `run_app.bat` | Chạy phần mềm + mở Chrome. Chết bất thường thì tự chạy lại sau 3 s. |
 | `run_simulator.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL** / **HYBRID**. |
 | `check_env.bat` | Kiểm tra máy (Python, thư viện, COM, máy in, MX Component, firewall) → `logs\check_env.txt`. |
-| `run_tests.bat` | 19 bài kiểm tra tự động (~2 phút), chạy được ngay trên máy trạm. |
+| `run_tests.bat` | 20 bài kiểm tra tự động (~2 phút), chạy được ngay trên máy trạm. |
 | `install.bat` | Cài thư viện Python. |
 | `tools\scanner_timeout.bat` | Gửi lệnh cấu hình xuống đầu đọc (mục 4). |
 | `tools\restart_ch340.bat` | Khởi động lại cổng CH340 bị kẹt, không cần gỡ/cài driver. |
+| `tools\reinstall_ch340.bat` | Gỡ và cài lại driver CH340 tự động (mục 4). |
 
 - Giao diện nghe ở `0.0.0.0:8600`; mật khẩu thẻ Cài đặt mặc định **1234**.
 - **AUTO**: thiết bị thật, DB `g8id`, gửi pallet tới server thật.
@@ -139,6 +140,13 @@ mã lỗi kèm nghĩa tiếng Việt hiện ở chỉ báo PLC và `device-*.log
 **Cổng CH340 kẹt khi bật máy** – giả thuyết: cân phát dữ liệu liên tục nên Windows nhận nhầm là
 chuột serial. `check_env.bat` báo cổng bị nhận là *Serial Mouse*; `tools\fix_serial_mouse.bat` tắt
 dịch vụ `sermouse` (có lệnh hoàn tác trong file). Driver gốc: `drivers\CH34x_Install_Windows_v3_4.EXE`.
+
+Vẫn phải gỡ / cài lại driver sau khi bật máy (PLC báo `Open lỗi 0x0180800C` dù đúng COM): thoát
+G8 ID, chuột phải `tools\reinstall_ch340.bat` → *Run as administrator*. Tool gỡ mọi gói
+CH341SER khỏi Driver Store, xoá các thiết bị CH340, cài lại driver 3.4 từ `drivers\CH341SER`
+(giải nén từ bộ cài gốc, chữ ký Microsoft WHQL) bằng `pnputil`, rồi in bảng cổng COM. Log ở
+`logs\reinstall_ch340-*.log`. Kiểm tra số COM vẫn khớp `config.json` và Logical Station của MX
+Component rồi mở lại `run_app.bat`.
 
 ## 5. Log – gửi kèm khi cần hỗ trợ
 
@@ -192,7 +200,7 @@ G8-ID-Deploy\
   simulator\    công cụ mô phỏng
   tests\        bộ kiểm tra tự động
   tools\        kiểm tra máy, firewall, CH340, đầu đọc
-  drivers\      EZio64/32.dll (Godex), G8_Label.bmp, bộ cài CH340
+  drivers\      EZio64/32.dll (Godex), G8_Label.bmp, bộ cài CH340 (+ CH341SER\ đã giải nén)
   mongodb\bin\  mongod.exe 4.4
   wheels\       thư viện Python cài offline
   config.json   cấu hình trạm      data\  dữ liệu (không trên git)      logs\  log
