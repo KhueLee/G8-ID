@@ -11,7 +11,7 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-python -c "import pymongo, serial, flask, waitress" >nul 2>nul
+python -c "import pymongo, serial, flask, waitress, comtypes" >nul 2>nul
 if errorlevel 1 (
   echo Chua co thu vien Python - dang chay install.bat ...
   call "%~dp0install.bat" nopause

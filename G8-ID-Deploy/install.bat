@@ -15,6 +15,6 @@ if errorlevel 1 (
   echo Cai offline khong duoc ^(khac phien ban Python?^) - thu cai qua internet...
   python -m pip install -r requirements.txt
 )
-python -c "import pymongo, serial, flask, waitress; print('Thu vien OK')"
+python -c "import pymongo, serial, flask, waitress, comtypes; print('Thu vien OK')"
 if errorlevel 1 echo [LOI] Cai thu vien that bai - xem thong bao o tren.
 if not "%1"=="nopause" pause
