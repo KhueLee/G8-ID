@@ -210,7 +210,7 @@ header `Content-Type: application/json; charset=utf-8`, body UTF-8 (tiếng Vi�
 Mọi bản tin vào (đủ body, IP gửi, mã phản hồi) và ra (body, HTTP status, nội dung phản hồi, thời
 gian) ghi trong `G8-ID-Deploy\logs\http-YYYYMMDD.log` của từng trạm, giữ 30 ngày – dùng để đối
 soát khi có tranh chấp. Có thể gửi lại một bản tin thật chép từ log bằng công cụ mô phỏng
-(`run_simulator.bat` → *Gửi bản tin thô*, chỉ ở chế độ MANUAL).
+(`chay_mo_phong.bat` → *Gửi bản tin thô*, chỉ ở chế độ MANUAL).
 
 Mã IF-04, IF-05 là đánh số mới trong tài liệu này (tài liệu cũ chỉ có IF-01 → IF-03); IF-03 giữ
 mã cũ nhưng nay gửi theo từng pallet, không còn trường `status: 8`.

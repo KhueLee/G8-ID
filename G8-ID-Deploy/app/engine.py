@@ -439,7 +439,7 @@ class Engine:
                 if why:
                     return {"ok": False, "title": "CHẾ ĐỘ AUTO",
                             "error": "CÔNG CỤ MÔ PHỎNG CHƯA ĐÓNG (%s). HÃY ĐÓNG CỬA SỔ "
-                                     "run_simulator.bat RỒI BẮT ĐẦU LẠI!" % why}
+                                     "chay_mo_phong.bat RỒI BẮT ĐẦU LẠI!" % why}
             if not d.printer.connected:
                 return {"ok": False, "title": "LỖI KẾT NỐI!!!", "error": "KIỂM TRA LẠI KẾT NỐI MÁY IN!!"}
             if not d.barcode.connected:
@@ -499,7 +499,7 @@ class Engine:
                 why = simguard.simulator_running(self)
                 if why:
                     raise OrderError("CÔNG CỤ MÔ PHỎNG CHƯA ĐÓNG (%s). Hãy đóng cửa sổ "
-                                     "run_simulator.bat rồi chuyển AUTO lại." % why)
+                                     "chay_mo_phong.bat rồi chuyển AUTO lại." % why)
             log.warning("ĐỔI CHẾ ĐỘ %s -> %s", self.mode, mode)
             self.dev.stop()
             self.mode = mode

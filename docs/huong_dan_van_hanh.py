@@ -1,5 +1,5 @@
 """Tạo G8-ID-Deploy/HUONG_DAN_VAN_HANH.pdf - hướng dẫn kỹ thuật vận hành dùng 2 biểu tượng
-"Chạy phần mềm" (run_app.bat) và "Chạy mô phỏng" (run_simulator.bat).
+"Chạy phần mềm" (chay_dinh_danh.bat) và "Chạy mô phỏng" (chay_mo_phong.bat).
 
 Chạy: python docs/huong_dan_van_hanh.py   (cần reportlab; font Arial của Windows)
 """
@@ -145,9 +145,9 @@ def build():
           Spacer(1, 10)]
     s += table([
         ["Biểu tượng trên Desktop", "Mở file", "Dùng khi nào"],
-        ["<b>Chạy phần mềm</b>", "run_app.bat",
+        ["<b>Chạy phần mềm</b>", "chay_dinh_danh.bat",
          "Mỗi ca / mỗi lần bật máy. Đây là phần mềm định danh dùng cho <b>sản xuất thật</b>."],
-        ["<b>Chạy mô phỏng</b>", "run_simulator.bat",
+        ["<b>Chạy mô phỏng</b>", "chay_mo_phong.bat",
          "Chỉ khi <b>chạy thử / kiểm tra</b>: giả lập hệ thống gửi lệnh (WMS/WCS), server nhận "
          "pallet (RCS) và – nếu cần – cả thiết bị tại bàn. <b>Không dùng khi đang sản xuất.</b>"],
     ], [42, 34, 98])
@@ -321,7 +321,7 @@ def build():
     s += steps([
         "Tắt phần mềm (mục A7). Nếu phần mềm còn chạy, update.bat sẽ báo "
         "<b>[DUNG] Phan mem dinh danh dang chay</b> và không cập nhật.",
-        "Mở thư mục phần mềm (thư mục có run_app.bat), nhấp đúp <b>update.bat</b>.",
+        "Mở thư mục phần mềm (thư mục có chay_dinh_danh.bat), nhấp đúp <b>update.bat</b>.",
         "Chờ dòng <b>[OK] Da cap nhat</b> (kèm danh sách thay đổi) hoặc "
         "<b>Da la ban moi nhat</b>. Bấm phím bất kỳ để đóng.",
         "Nhấp đúp <b>Chạy phần mềm</b> để chạy bản mới.",

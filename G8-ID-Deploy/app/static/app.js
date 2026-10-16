@@ -186,7 +186,7 @@ async function reprintPallet(palletId) {
 }
 async function changePass() { if (await act('/api/password', { new: val('m-pass') }, 'Đã đổi mật khẩu.')) pass = val('m-pass'); }
 async function quitApp() {
-  if (await confirmBox('Thoát hẳn phần mềm (đóng thiết bị, tắt cơ sở dữ liệu)?', 'Thoát', 'Yes', 'No')) await act('/api/quit', {}, 'Phần mềm đang thoát. Chạy lại run_app.bat để mở.');
+  if (await confirmBox('Thoát hẳn phần mềm (đóng thiết bị, tắt cơ sở dữ liệu)?', 'Thoát', 'Yes', 'No')) await act('/api/quit', {}, 'Phần mềm đang thoát. Chạy lại chay_dinh_danh.bat để mở.');
 }
 
 // ---------- thông số ----------

@@ -1,4 +1,4 @@
-"""Thiết bị giả cho chế độ MANUAL: nói chuyện với công cụ mô phỏng (run_simulator.bat) qua HTTP."""
+"""Thiết bị giả cho chế độ MANUAL: nói chuyện với công cụ mô phỏng (chay_mo_phong.bat) qua HTTP."""
 import json
 import logging
 import threading

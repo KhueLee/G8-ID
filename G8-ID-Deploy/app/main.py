@@ -1,7 +1,7 @@
-"""Điểm vào: python -m app.main  (chạy từ run_app.bat).
+"""Điểm vào: python -m app.main  (chạy từ chay_dinh_danh.bat).
 
 Mã thoát: 0 = thoát chủ động (không khởi động lại), 3 = đã có bản khác đang chạy,
-khác = lỗi -> run_app.bat tự khởi động lại sau vài giây.
+khác = lỗi -> chay_dinh_danh.bat tự khởi động lại sau vài giây.
 """
 import ctypes
 import logging

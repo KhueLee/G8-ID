@@ -1,4 +1,4 @@
-"""Công cụ mô phỏng (chạy bằng run_simulator.bat) - giả lập cân, đầu đọc, máy in, đèn tháp,
+"""Công cụ mô phỏng (chạy bằng chay_mo_phong.bat) - giả lập cân, đầu đọc, máy in, đèn tháp,
 hệ thống gửi lệnh (WMS/WCS) và server nhận pallet (RCS). Giao diện web: http://127.0.0.1:8700
 
 Chỉ chạy được khi phần mềm chính đang ở MANUAL (mô phỏng toàn bộ) hoặc HYBRID (thiết bị thật tại
@@ -291,7 +291,7 @@ def main():
         _, r = call(APP + "/api/mode", timeout=3)
     except Exception as e:
         print("\n[!] KHÔNG KẾT NỐI ĐƯỢC PHẦN MỀM CHÍNH (%s): %s" % (APP, e))
-        print("    Hãy chạy run_app.bat trước, chuyển sang MANUAL / HYBRID rồi mới chạy công cụ mô phỏng.")
+        print("    Hãy chạy chay_dinh_danh.bat trước, chuyển sang MANUAL / HYBRID rồi mới chạy công cụ mô phỏng.")
         return 2
     if r.get("mode") not in ("MANUAL", "HYBRID"):
         print("\n[!] PHẦN MỀM CHÍNH ĐANG Ở CHẾ ĐỘ %s." % r.get("mode"))

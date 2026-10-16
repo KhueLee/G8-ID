@@ -100,7 +100,7 @@ try {
         exit 1
     }
     Write-Host '[OK] Da go va cai lai driver CH340. Kiem tra so COM o tren khop config.json /'
-    Write-Host '     Logical Station cua MX Component, roi mo lai G8 ID (run_app.bat).'
+    Write-Host '     Logical Station cua MX Component, roi mo lai G8 ID (chay_dinh_danh.bat).'
     exit 0
 } catch {
     Write-Host ''

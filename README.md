@@ -23,20 +23,22 @@ Làm trên từng máy trạm. Máy cần vào được github.com (lần đầu
    git clone https://github.com/KhueLee/G8-ID.git C:\G8-ID
    ```
    Phần mềm nằm ở `C:\G8-ID\G8-ID-Deploy` (gọi tắt là *thư mục phần mềm*).
-4. Chạy `install.bat` trong thư mục phần mềm.
+4. Nhấp đúp **`cai_dat_may_moi.bat`** trong thư mục phần mềm, bấm *Yes* ở hộp thoại quyền
+   Administrator. File này làm hết các bước cần file bat (chạy lại nhiều lần cũng không sao):
+   cài thư viện Python (`install.bat`), mở firewall cổng 8500 (`tools\open_firewall.bat`), chống
+   Windows nhận nhầm cân là chuột serial (`tools\fix_serial_mouse.bat`, mục 4), tạo 2 biểu tượng
+   *Chạy phần mềm* / *Chạy mô phỏng* trên Desktop, hỏi có cài thời gian quét đầu đọc không
+   (`tools\scanner_timeout.bat`), cuối cùng chạy `check_env.bat`. Xong thì **khởi động lại máy** một lần.
 5. Sửa `config.json`: `station_id`, cổng COM cân / đầu đọc, `pallet_done_url`
    (cổng COM, máy in, PLC cũng sửa được ở thẻ **Cài đặt**).
-6. Chuột phải → *Run as administrator*:
-   - `tools\open_firewall.bat` – mở cổng 8500 nhận lệnh từ WMS.
-   - `tools\fix_serial_mouse.bat` – chống Windows nhận nhầm cân là chuột serial (mục 4), rồi
-     khởi động lại máy.
-7. **PLC / đèn tháp**: cài MX Component 5, tạo Logical Station (mục 4). Hiện các trạm dùng
+6. **PLC / đèn tháp**: cài MX Component 5, tạo Logical Station (mục 4). Hiện các trạm dùng
    Logical Station **0** (`devices.plc.station_number`), để `devices.plc.progid` rỗng.
-8. **Đầu đọc**: tắt G8 ID, chạy `tools\scanner_timeout.bat` một lần (mục 4); hai dòng phải `[OK]`.
-9. Tắt hẳn `VTP_Induction.exe` cũ (không dùng chung được cổng 8500 và cổng COM).
-10. Chạy `check_env.bat`, xử lý các dòng `[LỖI]`.
-11. **Chạy**: `run_app.bat` → Chrome mở `http://127.0.0.1:8600`. Để cửa sổ đen mở (thu nhỏ).
-    Tự chạy khi đăng nhập Windows: đặt shortcut của `run_app.bat` vào `shell:startup`.
+7. **Đầu đọc**: nếu ở bước 4 chưa cài (chưa cắm / chưa sửa cổng COM), tắt G8 ID rồi chạy
+   `tools\scanner_timeout.bat` một lần (mục 4); hai dòng phải `[OK]`.
+8. Tắt hẳn `VTP_Induction.exe` cũ (không dùng chung được cổng 8500 và cổng COM).
+9. Xử lý các dòng `[LỖI]` của `check_env.bat` (chạy lại được bất cứ lúc nào).
+10. **Chạy**: biểu tượng *Chạy phần mềm* (`chay_dinh_danh.bat`) → Chrome mở `http://127.0.0.1:8600`. Để cửa sổ đen mở (thu nhỏ).
+    Tự chạy khi đăng nhập Windows: đặt shortcut của `chay_dinh_danh.bat` vào `shell:startup`.
 
 MongoDB không cần cài: phần mềm tự bật `mongodb\bin\mongod.exe` (4.4), chỉ nghe ở 127.0.0.1,
 dữ liệu ở `data\db`.
@@ -51,12 +53,12 @@ $new = "C:\G8-ID\G8-ID-Deploy"
 Copy-Item "$old\config.json" "$new\config.json" -Force
 Copy-Item "$old\data" "$new\data" -Recurse -Force
 ```
-Chạy `install.bat`, mở `run_app.bat` ở thư mục mới, sửa shortcut trong `shell:startup` (nếu có).
+Chạy `install.bat`, mở `chay_dinh_danh.bat` ở thư mục mới, sửa shortcut trong `shell:startup` (nếu có).
 Chạy ổn rồi mới xoá thư mục cũ.
 
 ## 2. Cập nhật phiên bản mới
 
-1. **Đóng G8 ID** (cửa sổ đen `run_app.bat`) và công cụ mô phỏng.
+1. **Đóng G8 ID** (cửa sổ đen `chay_dinh_danh.bat`) và công cụ mô phỏng.
 2. Sao lưu dữ liệu (khuyến nghị):
    ```powershell
    Copy-Item C:\G8-ID\G8-ID-Deploy\data "C:\G8-ID-backup\data-$(Get-Date -Format yyyyMMdd)" -Recurse
@@ -67,7 +69,7 @@ Chạy ổn rồi mới xoá thư mục cũ.
    git pull
    ```
 4. Chạy `install.bat` (cài thư viện mới nếu có; không có gì mới cũng không sao).
-5. Mở `run_app.bat`.
+5. Mở `chay_dinh_danh.bat`.
 
 `git pull` chỉ tải và thay các file đã đổi. `data\` (MongoDB) và `logs\` không nằm trên git nên
 không bị đụng tới. Muốn xem trước: `git fetch` rồi `git diff --stat HEAD origin/main`.
@@ -87,11 +89,12 @@ git stash pop
 
 | File | Việc |
 |---|---|
-| `run_app.bat` | Chạy phần mềm + mở Chrome. Chết bất thường thì tự chạy lại sau 3 s. |
-| `run_simulator.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL** / **HYBRID**. |
-| `HUONG_DAN_VAN_HANH.pdf` | Hướng dẫn kỹ thuật vận hành: biểu tượng *Chạy phần mềm* (`run_app.bat`) và *Chạy mô phỏng* (`run_simulator.bat`). Nguồn: `docs\huong_dan_van_hanh.py`. |
+| `chay_dinh_danh.bat` | Chạy phần mềm + mở Chrome. Chết bất thường thì tự chạy lại sau 3 s. |
+| `chay_mo_phong.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL** / **HYBRID**. |
+| `HUONG_DAN_VAN_HANH.pdf` | Hướng dẫn kỹ thuật vận hành: biểu tượng *Chạy phần mềm* (`chay_dinh_danh.bat`) và *Chạy mô phỏng* (`chay_mo_phong.bat`). Nguồn: `docs\huong_dan_van_hanh.py`. |
 | `check_env.bat` | Kiểm tra máy (Python, thư viện, COM, máy in, MX Component, firewall) → `logs\check_env.txt`. |
 | `run_tests.bat` | 20 bài kiểm tra tự động (~2 phút), chạy được ngay trên máy trạm. |
+| `cai_dat_may_moi.bat` | Cài đặt máy trạm mới (mục 1, bước 4). |
 | `install.bat` | Cài thư viện Python. |
 | `tools\scanner_timeout.bat` | Gửi lệnh cấu hình xuống đầu đọc (mục 4). |
 | `tools\restart_ch340.bat` | Khởi động lại cổng CH340 bị kẹt, không cần gỡ/cài driver. |
@@ -101,7 +104,7 @@ git stash pop
 - **AUTO**: thiết bị thật, DB `g8id`, gửi pallet tới server thật.
   **MANUAL**: thiết bị và server giả của công cụ mô phỏng, DB riêng `g8id_manual`; cổng 8500 chỉ
   nhận lệnh từ chính máy (lệnh WMS bị trả 503). Đổi ở thẻ Cài đặt khi đang STOP. Không chuyển /
-  chạy AUTO được khi cửa sổ `run_simulator.bat` còn mở.
+  chạy AUTO được khi cửa sổ `chay_mo_phong.bat` còn mở.
   **HYBRID**: chạy thử thực tế tại bàn định danh — cân, đầu đọc, máy in, PLC là thiết bị thật
   (theo `config.json`), còn hệ thống bên ngoài là công cụ mô phỏng: gửi lệnh (WMS/WCS) và nhận
   pallet (RCS). Dữ liệu và giới hạn cổng 8500 giống MANUAL. Phần thiết bị giả trên công cụ mô
@@ -147,7 +150,7 @@ G8 ID, chuột phải `tools\reinstall_ch340.bat` → *Run as administrator*. To
 CH341SER khỏi Driver Store, xoá các thiết bị CH340, cài lại driver 3.4 từ `drivers\CH341SER`
 (giải nén từ bộ cài gốc, chữ ký Microsoft WHQL) bằng `pnputil`, rồi in bảng cổng COM. Log ở
 `logs\reinstall_ch340-*.log`. Kiểm tra số COM vẫn khớp `config.json` và Logical Station của MX
-Component rồi mở lại `run_app.bat`.
+Component rồi mở lại `chay_dinh_danh.bat`.
 
 ## 5. Log – gửi kèm khi cần hỗ trợ
 

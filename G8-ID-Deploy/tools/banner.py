@@ -1,4 +1,4 @@
-"""In tên chương trình (màu xanh lá) ở dòng đầu cửa sổ CMD. Gọi từ run_app.bat / run_simulator.bat."""
+"""In tên chương trình (màu xanh lá) ở dòng đầu cửa sổ CMD. Gọi từ chay_dinh_danh.bat / chay_mo_phong.bat."""
 import os
 import sys
 

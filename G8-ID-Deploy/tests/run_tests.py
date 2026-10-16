@@ -628,7 +628,7 @@ def e2e_tests(env):
         holder = subprocess.Popen('(ping -n 30 127.0.0.1 >nul) 9>"%s"' % lock, shell=True)
         time.sleep(4)
         r = http(APP + "/api/mode", {"mode": "AUTO"})[1]
-        assert not r["ok"] and "run_simulator.bat còn mở" in r["error"], r
+        assert not r["ok"] and "chay_mo_phong.bat còn mở" in r["error"], r
         subprocess.run("taskkill /F /T /PID %d" % holder.pid, shell=True, capture_output=True)
         time.sleep(4)
         # Đã đóng hẳn -> cho về AUTO
