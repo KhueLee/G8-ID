@@ -160,7 +160,7 @@ def build():
               "3. Muốn về AUTO phải <b>đóng hẳn</b> cửa sổ đen của \u201cChạy mô phỏng\u201d trước."])
     s += [P("Mục lục", h2)]
     s += bullets(["<b>Phần A – Chạy phần mềm</b>: mở, đọc màn hình, quy trình sản xuất, xử lý "
-                  "thông báo, đổi chế độ, tắt phần mềm.",
+                  "thông báo, đổi chế độ, tắt phần mềm, cập nhật phần mềm.",
                   "<b>Phần B – Chạy mô phỏng</b>: chuẩn bị, các ô trên công cụ, chạy thử MANUAL, "
                   "chạy thử HYBRID, trở về sản xuất.",
                   "<b>Phần C – Khi cần hỗ trợ</b>: gửi gì cho kỹ thuật phần mềm."])
@@ -217,7 +217,8 @@ def build():
         "tự <b>Bắt đầu</b> (hoặc bấm <b>Bắt đầu</b>).",
         "Dòng thông báo: <b>CHỜ ĐẶT SẢN PHẨM LÊN CÂN</b> → đặt thùng lên cân.",
         "Máy tự làm: <b>CÂN SẢN PHẨM...</b> → <b>ĐANG IN TEM...</b> → dán tem đúng vị trí cho "
-        "đầu đọc → <b>ĐANG ĐỌC MÃ VẠCH...</b>",
+        "đầu đọc → <b>ĐANG ĐỌC MÃ VẠCH...</b> Số to ở góc trên tem (cạnh logo) là "
+        "<b>số thứ tự của thùng trong pallet</b> (1, 2, 3 …), giống cột STT trong danh sách thùng.",
         "Thùng đạt: ô lớn <font color='#1e8a1e'><b>OK</b></font>, đèn xanh. Lấy thùng ra khỏi cân; "
         "khi thấy <b>SẴN SÀNG CHO SẢN PHẨM MỚI</b> thì đặt thùng tiếp theo.",
         "Đủ thùng của pallet: thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "
@@ -315,6 +316,20 @@ def build():
          "ở đâu. Ô 4–6 chỉ để lưu (giống bản cũ)."],
     ], [42, 26, 106])
 
+    s += [CondPageBreak(70 * mm), P("A9. Cập nhật phần mềm (update.bat)", h2),
+          P("Khi kỹ thuật phần mềm báo có bản mới, máy trạm cần có mạng:")]
+    s += steps([
+        "Tắt phần mềm (mục A7). Nếu phần mềm còn chạy, update.bat sẽ báo "
+        "<b>[DUNG] Phan mem dinh danh dang chay</b> và không cập nhật.",
+        "Mở thư mục phần mềm (thư mục có run_app.bat), nhấp đúp <b>update.bat</b>.",
+        "Chờ dòng <b>[OK] Da cap nhat</b> (kèm danh sách thay đổi) hoặc "
+        "<b>Da la ban moi nhat</b>. Bấm phím bất kỳ để đóng.",
+        "Nhấp đúp <b>Chạy phần mềm</b> để chạy bản mới.",
+    ])
+    s += box(["Thông số trong thẻ Cài đặt và dữ liệu sản xuất <b>không bị ảnh hưởng</b> khi cập nhật.",
+              "Nếu báo <b>[LOI] Khong cap nhat duoc</b>: kiểm tra mạng, rồi chụp màn hình cửa sổ "
+              "gửi kỹ thuật phần mềm. Không tự sửa / xóa file trong thư mục phần mềm."], SOFT, BRAND)
+
     # ------------------------------------------------------------------ PHẦN B
     s += [PageBreak()]
     s += section("PHẦN B – CHẠY MÔ PHỎNG", AMBER)
@@ -376,7 +391,7 @@ def build():
         "Ô <b>Hệ thống gửi lệnh</b>: gửi một lệnh nhỏ (vd 1 pallet × 3 thùng).",
         "Thao tác như sản xuất thật (mục A3): đặt thùng thật lên cân, máy in tem thật, dán tem, "
         "đầu đọc thật đọc lại, đèn tháp thật đổi màu.",
-        "Đủ thùng: in và quét tem pallet thật, bấm <b>Định danh</b>. Pallet được gửi tới "
+        "Đủ thùng: bấm <b>Định danh</b>. Pallet được gửi tới "
         "<b>server giả</b> (ô Server nhận pallet) – không có gì lên WMS thật.",
         "Muốn thử server lỗi: chọn <i>500 lỗi</i> trong ô Server nhận pallet trước khi bấm "
         "Định danh; chỉ báo RCS phải đỏ và máy tự gửi lại.",
