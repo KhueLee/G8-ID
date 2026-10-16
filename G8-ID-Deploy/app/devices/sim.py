@@ -132,10 +132,11 @@ class SimBarcode(_Polled):
 class SimPrinter(_Polled):
     name = "PRINTER"
 
-    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, weight_g, mfg_date=""):
+    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, weight_g, mfg_date="",
+                     seq=None):
         return self._print({"type": "carton", "code": parcel_code, "item_name": item_name,
                             "pallet": pallet_code, "wh_code": wh_code, "weight": weight_g,
-                            "mfg_date": mfg_date})
+                            "mfg_date": mfg_date, "seq": seq})
 
     def _print(self, body):
         try:

@@ -618,7 +618,7 @@ class Engine:
         t0 = time.time()
         printed = self.dev.printer.print_carton(
             code, p.get("item_name") or p.get("item_code", ""), pallet_id,
-            p.get("wh_code", ""), final, p.get("mfg_date", ""))
+            p.get("wh_code", ""), final, p.get("mfg_date", ""), seq=parcel.get("seq"))
         self.db.parcels.update_one({"_id": parcel["_id"]}, {"$inc": {"print_count": 1}})
         log.info("%s [PRINTER] in tem thùng: %s (%d ms), lần in thứ %d", tag,
                  "OK" if printed else "LỖI", (time.time() - t0) * 1000,
@@ -862,7 +862,7 @@ class Engine:
         p = self.db.pallets.find_one({"pallet_id": r["pallet_id"]}) or {}
         ok = self.dev.printer.print_carton(r["parcel_code"], p.get("item_name") or p.get("item_code", ""),
                                            r["pallet_id"], p.get("wh_code", ""), r.get("weight") or 0,
-                                           p.get("mfg_date", ""))
+                                           p.get("mfg_date", ""), seq=r.get("seq"))
         log.info("In lại tem thùng %s: %s", r["parcel_code"], "OK" if ok else "LỖI")
         if not ok:
             raise OrderError("IN LỖI " + r["parcel_code"])
@@ -930,7 +930,7 @@ class Engine:
                 code = r["parcel_code"]
                 ok = printer.print_carton(code, p.get("item_name") or p.get("item_code", ""), pid,
                                           p.get("wh_code", ""), r.get("weight") or 0,
-                                          p.get("mfg_date", ""))
+                                          p.get("mfg_date", ""), seq=r.get("seq"))
                 log.info("[REPRINT] pallet %s thùng %s (STT %s): %s", pid, code, r.get("seq"),
                          "OK" if ok else "LỖI")
                 if not ok:

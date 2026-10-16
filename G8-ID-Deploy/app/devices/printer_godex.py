@@ -16,7 +16,8 @@ log = logging.getLogger("device.printer")
 
 LABEL_W_MM, LABEL_H_MM, GAP_MM = 70, 40, 3
 SPEED_IPS, DARKNESS = 4, 10
-FW_EXTRALIGHT, FW_SEMIBOLD = 200, 600
+FW_EXTRALIGHT, FW_SEMIBOLD, FW_HEAVY = 200, 600, 900
+SEQ_X, SEQ_Y, SEQ_H = 125, 18, 64      # số thứ tự thùng: chữ to, cạnh logo, trái mã QR
 
 
 class GodexPrinter:
@@ -148,7 +149,8 @@ class GodexPrinter:
         data = text.encode("utf-16-le")
         dll.ecTextOutRW(x, y, h, b"Arial", data, 0, weight, 0, len(text))
 
-    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, weight_g, mfg_date=""):
+    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, weight_g, mfg_date="",
+                     seq=None):
         with self._lock:
             if not self._open:
                 return False
@@ -159,6 +161,8 @@ class GodexPrinter:
                 logo = config.path(self.cfg.get("logo") or "drivers/G8_Label.bmp")
                 if os.path.exists(logo):
                     dll.putimage(10, 20, logo.encode("mbcs"), 0)
+                if seq:
+                    self._text(dll, SEQ_X, SEQ_Y, SEQ_H, str(seq), FW_HEAVY)
                 dll.ecTextOutR(10, 90, 18, b"Arial", stamp.encode("mbcs"), 0, FW_EXTRALIGHT, 0)
                 y = 130
                 for line in ("Ten SP    : " + str(item_name), "Ma SP     : " + str(parcel_code),
