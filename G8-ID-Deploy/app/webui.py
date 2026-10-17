@@ -109,7 +109,7 @@ def build_ui(engine, on_quit):
     def info():
         cfg = config.get()
         return jsonify(
-            station=cfg["station_id"], version=config.VERSION, mode=engine.mode,
+            station=cfg["station_id"], desk_no=cfg.get("desk_no", 1), version=config.VERSION, mode=engine.mode,
             uptime_min=int((time.time() - engine.started_at) / 60),
             settings=engine.settings, devices=engine.dev.status(),
             device_cfg=cfg["devices"], order_port=cfg["order_server"]["port"],
@@ -165,7 +165,12 @@ def build_ui(engine, on_quit):
     def get_settings():
         cfg = config.get()
         return {"settings": engine.settings, "devices": cfg["devices"], "servers": cfg["servers"],
-                "mode": engine.mode, "ports": _ports()}
+                "desk_no": cfg.get("desk_no", 1), "mode": engine.mode, "ports": _ports()}
+
+    @app.get("/api/ports")
+    @guard
+    def get_ports():
+        return {"ports": _ports()}
 
     @app.post("/api/settings")
     @guard
@@ -187,11 +192,31 @@ def build_ui(engine, on_quit):
             patch["devices"] = b["devices"]
         if isinstance(b.get("servers"), dict):
             patch["servers"] = b["servers"]
+        if "desk_no" in b:
+            try:
+                desk = int(b["desk_no"])
+            except (TypeError, ValueError):
+                desk = 0
+            if not 1 <= desk <= 999:
+                raise OrderError("Số thứ tự bàn định danh phải là số từ 1 đến 999.")
+            patch["desk_no"] = desk
         if engine.running:
             raise OrderError("Hãy bấm Dừng trước khi sửa cấu hình thiết bị.")
+        if "devices" in patch:
+            merged = {k: dict(v, **patch["devices"].get(k, {}))
+                      for k, v in config.get()["devices"].items()}
+            why = config.com_conflict(merged)
+            if why:
+                raise OrderError(why + " Mỗi cổng COM chỉ gán cho một thiết bị.")
         config.save(patch)
         log.info("Đã lưu cấu hình thiết bị/server: %s", patch)
         engine.reconnect_devices()
+
+    @app.post("/api/devices/test")
+    @guard
+    def test_device():
+        b = body()
+        return engine.test_device(b.get("device"), b.get("cfg") if isinstance(b.get("cfg"), dict) else {})
 
     @app.post("/api/print_manual")
     @guard
@@ -242,8 +267,9 @@ def build_ui(engine, on_quit):
 def _ports():
     try:
         from serial.tools import list_ports
-        return [{"port": p.device, "desc": p.description, "hwid": p.hwid}
-                for p in list_ports.comports()]
+        ports = sorted(list_ports.comports(),
+                       key=lambda p: (len(p.device), p.device))  # COM2 trước COM10
+        return [{"port": p.device, "desc": p.description, "hwid": p.hwid} for p in ports]
     except Exception:
         return []
 

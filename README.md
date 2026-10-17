@@ -29,8 +29,8 @@ Làm trên từng máy trạm. Máy cần vào được github.com (lần đầu
    Windows nhận nhầm cân là chuột serial (`tools\fix_serial_mouse.bat`, mục 4), tạo 2 biểu tượng
    *Chạy phần mềm* / *Chạy mô phỏng* trên Desktop, hỏi có cài thời gian quét đầu đọc không
    (`tools\scanner_timeout.bat`), cuối cùng chạy `check_env.bat`. Xong thì **khởi động lại máy** một lần.
-5. Sửa `config.json`: `station_id`, cổng COM cân / đầu đọc, `pallet_done_url`
-   (cổng COM, máy in, PLC cũng sửa được ở thẻ **Cài đặt**).
+5. Sửa `config.json`: `station_id`, `desk_no` (số thứ tự bàn định danh), cổng COM cân / đầu đọc,
+   `pallet_done_url` (số bàn, cổng COM, máy in, PLC cũng sửa được ở thẻ **Cài đặt**, xem mục 4).
 6. **PLC / đèn tháp**: cài MX Component 5, tạo Logical Station (mục 4). Hiện các trạm dùng
    Logical Station **0** (`devices.plc.station_number`), để `devices.plc.progid` rỗng.
 7. **Đầu đọc**: nếu ở bước 4 chưa cài (chưa cắm / chưa sửa cổng COM), tắt G8 ID rồi chạy
@@ -123,6 +123,21 @@ git stash pop
 | Đầu đọc Honeywell | COM3, 9600 8N1. Bật quét `16 54 0D`, tắt `16 55 0D`; thời gian chờ đọc mã ở thẻ Cài đặt (mặc định 5000 ms). |
 | Máy in Godex EZ520+ | USB qua `drivers\EZio64.dll`. |
 | PLC Mitsubishi | MX Component 5, đèn tháp M0 đỏ / M1 xanh / M2 vàng / M10 tắt. |
+
+**Chọn cổng COM ở thẻ Cài đặt → Thiết bị**
+- Ô *Cổng* chỉ liệt kê các cổng COM Windows đang thấy, kèm tên thiết bị, cộng thêm **None** (không
+  dùng thiết bị đó, phần mềm không mở cổng). Cắm thêm cáp thì bấm *Dò lại cổng COM*. Cổng trong
+  `config.json` mà không còn trên máy hiện là *KHÔNG CÓ TRÊN MÁY*.
+- Một cổng chỉ gán cho một thiết bị: cổng đã gán cho thiết bị khác bị khoá, ghi *[đang dùng: …]*;
+  muốn chuyển thì đặt thiết bị kia về None trước. Lưu mà trùng cổng sẽ bị từ chối. Cổng COM của
+  máy in chỉ tính khi *Kiểu kết nối* = COM; của PLC chỉ tính khi bật *Dùng PLC*.
+- PLC đặt cổng COM trong *Communication Settings Utility*; ô *Cổng COM của Logical Station* chỉ để
+  ghi lại cổng đó cho phần mềm không gán trùng (`devices.plc.com_port`).
+- Nút **Kiểm tra** dùng cấu hình đang chọn, chưa cần lưu (phải đang STOP). Phần mềm tạm đóng cổng
+  của thiết bị đó rồi mở lại sau khi thử. *Cân*: nghe 3 s, đọc ra khối lượng là đạt. *Đầu đọc*: gửi
+  lệnh bật quét, đưa một mã vạch vào trong 6 s; cổng tự gửi số liên tục thì báo “giống cân”.
+  *Máy in*: mở kết nối EZio (muốn chắc thì *In thử*). *PLC*: Open/Close Logical Station.
+  Kết quả ghi vào `app-*.log` (`Kiểm tra …`).
 
 **Đầu đọc** – `tools\scanner_timeout.bat` gửi hai lệnh bản cũ để lại
 (`resource\Cai thoi gian quet pda.txt`): `16 4D 0D` + `TRGSTO300000.` (tự tắt quét sau 300 s, lưu

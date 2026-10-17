@@ -94,24 +94,31 @@
     </div>
     <div class="card">
       <h3>Thiết bị</h3>
+      <label>Số thứ tự bàn định danh<input id="d-desk_no" type="number" min="1" max="999"></label>
+      <p class="hint" id="comhint"></p>
+      <button class="b" onclick="refreshPorts()">&#8635; Dò lại cổng COM</button>
       <h4>Cân (RS232)</h4>
-      <div class="grid2"><label>Cổng<input id="d-scale-port" list="comlist"></label><label>Baudrate<input id="d-scale-baudrate" type="number"></label></div>
+      <div class="grid2"><label>Cổng<select id="d-scale-port" class="comsel"></select></label><label>Baudrate<input id="d-scale-baudrate" type="number"></label></div>
+      <button class="b" data-test="scale">Kiểm tra cân</button><p class="testres" id="t-scale"></p>
       <h4>Đầu đọc mã vạch (RS232)</h4>
-      <div class="grid2"><label>Cổng<input id="d-barcode-port" list="comlist"></label><label>Baudrate<input id="d-barcode-baudrate" type="number"></label></div>
+      <div class="grid2"><label>Cổng<select id="d-barcode-port" class="comsel"></select></label><label>Baudrate<input id="d-barcode-baudrate" type="number"></label></div>
+      <button class="b" data-test="barcode">Kiểm tra đầu đọc</button><p class="testres" id="t-barcode"></p>
       <h4>Máy in Godex</h4>
       <div class="grid2">
         <label>Kiểu kết nối<select id="d-printer-connect_type"><option>USB</option><option>COM</option><option>LAN</option><option>DRIVER</option></select></label>
         <label>Tên USB (trống = tự tìm)<input id="d-printer-usb_name"></label>
-        <label>Cổng COM<input id="d-printer-com_port" list="comlist"></label>
+        <label>Cổng COM<select id="d-printer-com_port" class="comsel"></select></label>
         <label>IP LAN<input id="d-printer-lan_ip"></label>
         <label>Tên driver Windows<input id="d-printer-driver_name"></label>
       </div>
+      <button class="b" data-test="printer">Kiểm tra máy in</button><p class="testres" id="t-printer"></p>
       <h4>PLC / đèn tháp (MX Component)</h4>
-      <div class="grid2"><label class="chk"><input id="d-plc-enabled" type="checkbox"> Dùng PLC</label><label>Logical Station<input id="d-plc-station_number" type="number"></label></div>
+      <div class="grid2"><label class="chk"><input id="d-plc-enabled" type="checkbox"> Dùng PLC</label><label>Logical Station<input id="d-plc-station_number" type="number"></label>
+        <label>Cổng COM của Logical Station<select id="d-plc-com_port" class="comsel"></select></label></div>
+      <p class="hint">Cổng COM của PLC được đặt trong Communication Settings Utility; chọn ở đây cùng cổng đó để không gán trùng cho thiết bị khác.</p>
+      <button class="b" data-test="plc">Kiểm tra PLC</button><p class="testres" id="t-plc"></p>
       <h4>Server nhận pallet</h4>
       <label>URL<input id="v-pallet_done_url"></label>
-      <datalist id="comlist"></datalist>
-      <p class="hint" id="comhint"></p>
       <button class="b ok" onclick="saveDevices()">Lưu + kết nối lại thiết bị</button>
     </div>
     <div class="card">

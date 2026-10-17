@@ -112,3 +112,7 @@ table.grid button { margin: 0; padding: 3px 8px; }
 .mbox h3 { margin: 0 0 10px; } .mbox p { font-size: 18px; white-space: pre-wrap; margin: 0 0 14px; }
 .mbox input { width: 100%; font-size: 20px; padding: 8px; margin-bottom: 14px; }
 .mbtns { text-align: right; } .mbtns button { font-size: 16px; padding: 10px 26px; margin-left: 10px; cursor: pointer; }
+
+.testres { margin: 4px 0 10px; font-size: 13px; color: #aaa; white-space: pre-wrap; }
+.testres.good { color: #4caf50; } .testres.bad, .hint.bad { color: #ff5252; }
+.card select:disabled { opacity: .5; }

@@ -72,6 +72,9 @@ class SerialScale:
                 log.warning("Lỗi đóng cổng cân: %s", e)
 
     def _run(self):
+        if not self.cfg.get("port"):
+            self._error = "không dùng (cổng None)"
+            return
         backoff = 3
         buf = b""
         while not self._stop.is_set():

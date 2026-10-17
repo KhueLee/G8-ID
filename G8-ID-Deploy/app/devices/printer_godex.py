@@ -103,7 +103,9 @@ class GodexPrinter:
             ok = dll.OpenUSB(name.encode("mbcs")) == 1
             target = "USB " + name
         elif kind == "COM":
-            target = self.cfg["com_port"]
+            target = self.cfg.get("com_port") or ""
+            if not target:
+                raise RuntimeError("kiểu kết nối COM nhưng chưa chọn cổng (None)")
             num = "".join(ch for ch in target if ch.isdigit())
             ok = bool(dll.openport(num.encode()))
             if ok and self.cfg.get("baudrate"):

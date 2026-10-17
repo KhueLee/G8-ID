@@ -35,7 +35,7 @@ function render(s) {
   state = s;
   $('swName').textContent = s.software;
   $('clock').textContent = s.time;
-  $('meta').textContent = `${s.date} · v${s.version} · ${s.station} · ${s.mode}`;
+  $('meta').textContent = `${s.date} · v${s.version} · ${s.station} · Bàn ${s.desk_no} · ${s.mode}`;
   $('manualBanner').classList.toggle('hidden', s.mode === 'AUTO');
   $('manualBanner').textContent = s.mode === 'HYBRID'
     ? 'CHẾ ĐỘ HYBRID (THIẾT BỊ THẬT + WCS/RCS MÔ PHỎNG) — không dùng cho sản xuất thật'
@@ -139,7 +139,10 @@ async function openTab(name) {
 
 // ---------- cài đặt ----------
 const S_NUM = ['scale_value', 'scale_error', 'time_scale'];
-const D_FIELDS = { scale: ['port', 'baudrate'], barcode: ['port', 'baudrate'], printer: ['connect_type', 'usb_name', 'com_port', 'lan_ip', 'driver_name'], plc: ['enabled', 'station_number'] };
+const D_FIELDS = { scale: ['port', 'baudrate'], barcode: ['port', 'baudrate'], printer: ['connect_type', 'usb_name', 'com_port', 'lan_ip', 'driver_name'], plc: ['enabled', 'station_number', 'com_port'] };
+const COM_SEL = { scale: 'd-scale-port', barcode: 'd-barcode-port', printer: 'd-printer-com_port', plc: 'd-plc-com_port' };
+const DEV_NAME = { scale: 'Cân', barcode: 'Đầu đọc', printer: 'Máy in', plc: 'PLC' };
+let ports = [];
 async function loadSettings() {
   const r = await api('/api/settings');
   if (!r.ok) return alertBox(r.error, 'LỖI');
@@ -150,10 +153,72 @@ async function loadSettings() {
   $('s-auto_start_on_order').checked = s.auto_start_on_order;
   $('s-pallet_done_trigger').value = s.pallet_done_trigger;
   for (let i = 0; i < 6; i++) $('s-pos' + i).value = s.positions[i] || '';
-  for (const d in D_FIELDS) D_FIELDS[d].forEach(k => { const e = $(`d-${d}-${k}`); if (e.type === 'checkbox') e.checked = !!r.devices[d][k]; else e.value = r.devices[d][k]; });
+  for (const d in D_FIELDS) D_FIELDS[d].forEach(k => { const e = $(`d-${d}-${k}`); if (e.type === 'checkbox') e.checked = !!r.devices[d][k]; else if (!e.classList.contains('comsel')) e.value = r.devices[d][k] == null ? '' : r.devices[d][k]; });
+  $('d-desk_no').value = r.desk_no;
   $('v-pallet_done_url').value = r.servers.pallet_done_url;
-  $('comlist').innerHTML = r.ports.map(p => `<option value="${esc(p.port)}">${esc(p.desc)}</option>`).join('');
-  $('comhint').textContent = 'Cổng COM đang có: ' + (r.ports.map(p => `${p.port} (${p.desc})`).join(', ') || 'không có');
+  document.querySelectorAll('.testres').forEach(e => { e.textContent = ''; e.className = 'testres'; });
+  ports = r.ports;
+  fillPorts(Object.fromEntries(Object.keys(COM_SEL).map(d => [d, r.devices[d][COM_SEL[d].split('-').pop()] || ''])));
+}
+
+// ---------- chọn cổng COM: chỉ cổng đang có trên máy + None, không cho hai thiết bị trùng cổng ----------
+const comActive = d => d === 'printer' ? val('d-printer-connect_type') === 'COM' : d === 'plc' ? $('d-plc-enabled').checked : true;
+function fillPorts(current) {
+  for (const d in COM_SEL) {
+    const sel = $(COM_SEL[d]), want = String(current[d] || '').trim().toUpperCase();
+    const opts = [['', 'None (không dùng)']].concat(ports.map(p => [p.port, `${p.port} — ${p.desc}`]));
+    const have = opts.find(([v]) => v && v.toUpperCase() === want);
+    if (want && !have) opts.splice(1, 0, [want, `${want} — KHÔNG CÓ TRÊN MÁY`]);
+    sel.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}" data-label="${esc(t)}">${esc(t)}</option>`).join('');
+    sel.value = have ? have[0] : want;
+  }
+  $('comhint').textContent = 'Cổng COM đang có trên máy: ' + (ports.map(p => `${p.port} (${p.desc})`).join(', ') || 'không có');
+  markTaken();
+}
+function markTaken() {
+  const used = {}, clash = [];
+  for (const d in COM_SEL) {
+    const p = val(COM_SEL[d]).toUpperCase();
+    if (!comActive(d) || !p) continue;
+    if (used[p]) clash.push(`${p}: ${DEV_NAME[used[p]]} và ${DEV_NAME[d]}`); else used[p] = d;
+  }
+  for (const d in COM_SEL) {
+    const sel = $(COM_SEL[d]);
+    sel.disabled = !comActive(d);
+    for (const o of sel.options) {
+      const by = o.value && used[o.value.toUpperCase()], taken = by && by !== d && o.value !== sel.value;
+      o.disabled = !!taken;
+      o.textContent = o.dataset.label + (taken ? `  [đang dùng: ${DEV_NAME[by]}]` : '');
+    }
+  }
+  const h = $('comhint');
+  h.classList.toggle('bad', clash.length > 0);
+  if (clash.length) h.textContent = 'TRÙNG CỔNG — ' + clash.join('; ') + '. Đổi một thiết bị sang cổng khác hoặc None.';
+}
+document.addEventListener('change', e => { if (e.target.classList.contains('comsel') || ['d-printer-connect_type', 'd-plc-enabled'].includes(e.target.id)) markTaken(); });
+async function refreshPorts() {
+  const r = await api('/api/ports');
+  if (!r.ok) return alertBox(r.error, 'LỖI');
+  ports = r.ports;
+  fillPorts(Object.fromEntries(Object.keys(COM_SEL).map(d => [d, val(COM_SEL[d])])));
+}
+function formDevice(d) {
+  const o = {};
+  D_FIELDS[d].forEach(k => { const e = $(`d-${d}-${k}`); o[k] = e.type === 'checkbox' ? e.checked : e.type === 'number' ? Number(e.value) : e.value.trim(); });
+  return o;
+}
+async function testDevice(d, btn) {
+  const out = $('t-' + d);
+  out.className = 'testres';
+  out.textContent = d === 'barcode' ? 'Đang kiểm tra… đưa một mã vạch vào trước đầu đọc (chờ tối đa 6 s).' : 'Đang kiểm tra…';
+  btn.disabled = true;
+  try {
+    const r = await api('/api/devices/test', { device: d, cfg: formDevice(d) });
+    out.textContent = r.ok ? r.text : r.error;
+    out.classList.add(r.ok && r.pass ? 'good' : 'bad');
+  } catch (e) {
+    out.textContent = 'Lỗi: ' + e; out.classList.add('bad');
+  } finally { btn.disabled = false; }
 }
 async function act(path, body, okText) {
   const r = await api(path, body);
@@ -169,8 +234,8 @@ async function saveSettings() {
 async function saveDevices() {
   if (!(await confirmBox('Do you want to reset all of the connections', 'Warning!'))) return;
   const devices = {};
-  for (const d in D_FIELDS) { devices[d] = {}; D_FIELDS[d].forEach(k => { const e = $(`d-${d}-${k}`); devices[d][k] = e.type === 'checkbox' ? e.checked : e.type === 'number' ? Number(e.value) : e.value.trim(); }); }
-  await act('/api/devices', { devices, servers: { pallet_done_url: val('v-pallet_done_url').trim() } }, 'Đã lưu và kết nối lại thiết bị.');
+  for (const d in D_FIELDS) devices[d] = formDevice(d);
+  await act('/api/devices', { devices, desk_no: Number(val('d-desk_no')), servers: { pallet_done_url: val('v-pallet_done_url').trim() } }, 'Đã lưu và kết nối lại thiết bị.');
 }
 async function setMode(m) {
   if (!(await confirmBox(`Chuyển sang chế độ ${m}?`, 'Chế độ chạy', 'Yes', 'No'))) return;
@@ -193,7 +258,7 @@ async function quitApp() {
 const kv = (id, rows) => $(id).innerHTML = rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
 async function loadInfo() {
   const r = await api('/api/info'), s = r.settings;
-  kv('i-station', [['Mã trạm', r.station], ['Phiên bản', r.version], ['Chế độ', r.mode], ['Đã chạy', r.uptime_min + ' phút'],
+  kv('i-station', [['Mã trạm', r.station], ['Bàn định danh số', r.desk_no], ['Phiên bản', r.version], ['Chế độ', r.mode], ['Đã chạy', r.uptime_min + ' phút'],
     ['Khối lượng chuẩn', s.scale_value + ' g (dùng khi lệnh không gửi Weight_ref)'], ['Sai số', '± ' + s.scale_error + ' g'], ['Thời gian cân', s.time_scale + ' s'],
     ['Gửi pallet', s.pallet_done_trigger === 'auto' ? 'Tự động' : 'Bấm nút ĐỊNH DANH'], ['Vị trí sàn', s.positions.join(', ')]]);
   kv('i-dev', [...['plc', 'printer', 'scale', 'barcode'].map(k => [k.toUpperCase(), (r.devices[k].ok ? 'ĐÃ KẾT NỐI' : 'MẤT KẾT NỐI') + ' — ' + r.devices[k].detail]),
@@ -219,6 +284,7 @@ document.addEventListener('click', async e => {
   const t = e.target;
   if (t.dataset.cancel) { if (await needPass() && await confirmBox('Hủy pallet ' + t.dataset.cancel + '?', 'Hủy', 'Yes', 'No')) { await act('/api/cancel', { pallet_id: t.dataset.cancel }, 'Đã hủy pallet.'); loadInfo(); } }
   if (t.dataset.reload) { if (await needPass() && await confirmBox('Nạp lại pallet ' + t.dataset.reload + ' để làm lại?', 'Reload', 'Yes', 'No')) { await act('/api/reload', { pallet_id: t.dataset.reload }, 'Đã nạp lại pallet.'); loadInfo(); } }
+  if (t.dataset.test) await testDevice(t.dataset.test, t);
   if (t.dataset.reprint) { if (await needPass()) await reprintPallet(t.dataset.reprint); }
   if (t.dataset.parcels) {
     const r = await api('/api/history/parcels?pallet=' + encodeURIComponent(t.dataset.parcels));

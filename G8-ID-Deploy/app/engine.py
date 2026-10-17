@@ -99,6 +99,7 @@ class Engine:
         self._last_send = {}
         self.sim_heartbeat = 0.0
         self._sim_seen = (0.0, False)
+        self._testing = ""       # thiết bị đang được kiểm tra ở thẻ Cài đặt (driver tạm đóng)
         self.started_at = time.time()
 
     # ------------------------------------------------------------------ cấu hình
@@ -433,6 +434,10 @@ class Engine:
             if self._job_active():
                 return {"ok": False, "title": "THÔNG BÁO",
                         "error": "ĐANG IN LẠI TEM PALLET. CHỜ IN XONG HOẶC BẤM DỪNG ĐỂ HỦY."}
+            if self._testing:
+                return {"ok": False, "title": "THÔNG BÁO",
+                        "error": "ĐANG KIỂM TRA %s Ở THẺ CÀI ĐẶT. CHỜ KIỂM TRA XONG."
+                                 % config.DEVICE_NAMES[self._testing].upper()}
             d = self.dev
             if not self.manual:
                 why = simguard.simulator_running(self)
@@ -516,6 +521,8 @@ class Engine:
     def reconnect_devices(self):
         if self.running:
             raise OrderError("Hãy bấm Dừng trước khi kết nối lại thiết bị.")
+        if self._testing:
+            raise OrderError("Đang kiểm tra thiết bị, chờ xong rồi lưu lại.")
         self._no_job()
         with self.lock:
             log.info("Kết nối lại toàn bộ thiết bị theo cấu hình mới")
@@ -523,6 +530,39 @@ class Engine:
             self.cfg = config.get()
             self.dev = devices.build(self.cfg, self.sim_devices)
             self.dev.start()
+
+    def test_device(self, name, dcfg):
+        """Kiểm tra một thiết bị thật với cấu hình đang chọn ở thẻ Cài đặt (chưa lưu).
+
+        Driver đang giữ cùng cổng (kể cả chính thiết bị đó) được tạm đóng rồi mở lại sau.
+        """
+        from .devices import probe
+        if name not in probe.TESTS:
+            raise OrderError("Không có thiết bị " + str(name))
+        if self.running:
+            raise OrderError("Hãy bấm Dừng trước khi kiểm tra thiết bị.")
+        self._no_job()
+        # Chỉ giữ khoá lúc đóng/mở driver: thử thiết bị mất vài giây, không chặn lệnh WMS đến.
+        with self.lock:
+            if self.running or self._testing:
+                raise OrderError("Đang chạy hoặc đang kiểm tra thiết bị khác.")
+            self._testing = name
+            cfg = dict(self.cfg["devices"][name], **(dcfg or {}))
+            target = config.com_ports({**self.cfg["devices"], name: cfg}).get(name)
+            live = config.com_ports(self.cfg["devices"])
+            dev = self.dev
+            hold = [d for d in probe.TESTS if d == name or (target and live.get(d) == target)]
+            for d in hold:
+                getattr(dev, d).stop()
+        try:
+            ok, text = probe.TESTS[name](cfg)
+        finally:
+            with self.lock:
+                for d in hold:
+                    getattr(dev, d).start()
+                self._testing = ""
+        log.info("Kiểm tra %s %s: %s", name, target or "", text)
+        return {"pass": ok, "text": text}
 
     # ------------------------------------------------------------------ vòng lặp chính
     def _run(self):
@@ -1054,7 +1094,8 @@ class Engine:
             self._sim_seen = (time.time(), bool(simguard.simulator_running(self)))
         return {
             "time": time.strftime("%H:%M:%S"), "date": time.strftime("%d/%m/%Y"),
-            "station": self.cfg["station_id"], "software": self.cfg["software_name"],
+            "station": self.cfg["station_id"], "desk_no": self.cfg.get("desk_no", 1),
+            "software": self.cfg["software_name"],
             "version": config.VERSION, "mode": self.mode, "running": self.running,
             "big": self.big, "big_color": self.big_color,
             "message": self.message, "msg_color": self.msg_color, "light": self.light,

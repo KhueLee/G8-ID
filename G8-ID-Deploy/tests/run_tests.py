@@ -103,6 +103,8 @@ def unit_tests():
     check("Driver đầu đọc RS232: kích 16 54 0D / tắt 16 55 0D, hết giờ, Dừng", t_serial_barcode)
     check("Driver máy in: nạp được EZio DLL của bản cũ", t_printer_dll)
     check("Driver PLC MX Component (control giả): Open, đèn M0/M1/M2/M10, mất nối, Close", t_plc_mx)
+    check("Cổng COM: None không mở cổng, chặn hai thiết bị trùng cổng", t_com_none_conflict)
+    check("Kiểm tra thiết bị ở thẻ Cài đặt: nhận ra cân / đầu đọc / sai cổng", t_probe)
 
 
 class FakeSerial:
@@ -185,6 +187,69 @@ def t_serial_barcode():
         assert port.closed and port.written[-1] == b"\x16U\r"
     finally:
         barcode.open_serial = real
+
+
+def t_com_none_conflict():
+    from app import config
+    from app.devices import barcode, scale
+    opened = []
+    real = scale.open_serial, barcode.open_serial
+    scale.open_serial = barcode.open_serial = lambda cfg, timeout: opened.append(cfg) or FakeSerial()
+    try:
+        devs = [scale.SerialScale({"port": "", "baudrate": 9600}), barcode.SerialBarcode({"port": "", "baudrate": 9600})]
+        for d in devs:
+            d.start()
+        time.sleep(0.3)
+        for d in devs:
+            assert not d.connected and "None" in d.status()["detail"], d.status()
+            d.stop()
+        assert not opened, "cổng None không được mở"
+    finally:
+        scale.open_serial, barcode.open_serial = real
+    devices = {"scale": {"port": "COM4"}, "barcode": {"port": "com4"},
+               "printer": {"connect_type": "USB", "com_port": "COM4"},
+               "plc": {"enabled": False, "com_port": "COM4"}}
+    assert "Cân và Đầu đọc" in config.com_conflict(devices), config.com_conflict(devices)
+    devices["barcode"]["port"] = "COM3"
+    assert config.com_conflict(devices) == "", "máy in USB / PLC tắt không chiếm cổng"
+    devices["printer"]["connect_type"] = "COM"
+    assert "Máy in" in config.com_conflict(devices)
+    devices["printer"]["com_port"] = ""
+    devices["scale"]["port"] = devices["barcode"]["port"] = ""
+    assert config.com_conflict(devices) == "", "nhiều thiết bị None không tính là trùng"
+
+
+def t_probe():
+    from app.devices import barcode, probe
+    real = probe.open_serial
+    try:
+        probe.open_serial = lambda cfg, timeout: FakeSerial([b"ST,GS,+  0.3", b"05kg\r\n"])
+        ok, text = probe.scale({"port": "COM4", "baudrate": 9600})
+        assert ok and "305 g" in text, text
+        stream = FakeSerial([b"ST,GS,+  0.305kg" + bytes([13, 10])] * 100)
+        stream.reset_input_buffer = lambda: None      # cân phát liên tục, xoá đệm vẫn có số mới
+        probe.open_serial = lambda cfg, timeout: stream
+        ok, text = probe.barcode({"port": "COM4", "baudrate": 9600})
+        assert not ok and "giống cân" in text and not stream.written, (text, stream.written)
+        port = FakeSerial()
+        port.reply = b"TP0231\r\n"
+        probe.open_serial = lambda cfg, timeout: port
+        ok, text = probe.barcode({"port": "COM3", "baudrate": 9600})
+        assert ok and "TP0231" in text and port.written == [barcode.TRIGGER_ON, barcode.TRIGGER_OFF], (text, port.written)
+        probe.SCALE_LISTEN_S = 0.3
+        probe.open_serial = lambda cfg, timeout: FakeSerial()
+        ok, text = probe.scale({"port": "COM3", "baudrate": 9600})
+        assert not ok and "không có dữ liệu" in text, text
+
+        def boom(cfg, timeout):
+            raise OSError("could not open port")
+        probe.open_serial = boom
+        ok, text = probe.scale({"port": "COM9", "baudrate": 9600})
+        assert not ok and "COM9" in text, text
+        ok, text = probe.barcode({"port": "", "baudrate": 9600})
+        assert not ok and "None" in text, text
+    finally:
+        probe.open_serial, probe.SCALE_LISTEN_S = real, 3.0
 
 
 def t_printer_dll():

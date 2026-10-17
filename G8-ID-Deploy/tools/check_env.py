@@ -99,14 +99,20 @@ def main():
                     % p.device)
         have = {p.device.upper() for p in ports}
         for name in ("scale", "barcode"):
-            want = str(cfg["devices"][name]["port"]).upper()
+            want = str(cfg["devices"][name]["port"] or "").upper()
+            if not want:
+                out("CẢNH BÁO", "%s chọn cổng None - không dùng" % name.upper())
+                continue
             out("OK" if want in have else "LỖI", "%s cấu hình %s %s" % (
                 name.upper(), want, "- có trên máy" if want in have else "- KHÔNG có trên máy"))
+        why = config.com_conflict(cfg["devices"])
+        if why:
+            out("LỖI", why)
         if not running:
             import serial
             for name in ("scale", "barcode"):
-                want = cfg["devices"][name]["port"]
-                if want.upper() in have:
+                want = cfg["devices"][name]["port"] or ""
+                if want and want.upper() in have:
                     try:
                         serial.Serial(want, int(cfg["devices"][name]["baudrate"]), timeout=0.2).close()
                         out("OK", "Mở/đóng thử %s được" % want)

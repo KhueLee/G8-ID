@@ -55,6 +55,9 @@ class SerialBarcode:
 
     def _keepalive(self):
         """Giữ cổng luôn mở; rớt thì tự nối lại (3 -> 30 s)."""
+        if not self.cfg.get("port"):
+            self._error = "không dùng (cổng None)"
+            return
         backoff = 3
         while not self._stop.is_set():
             with self._lock:

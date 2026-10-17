@@ -10,6 +10,7 @@ VERSION = "2.1.0"
 
 DEFAULTS = {
     "station_id": "ST01",
+    "desk_no": 1,                # số thứ tự bàn định danh (hiện trên màn hình, thẻ Thông số)
     "software_name": "ĐỊNH DANH SẢN PHẨM",
     "ui": {"host": "0.0.0.0", "port": 8600, "password": "1234",
            "open_browser": True, "kiosk": False},
@@ -27,9 +28,10 @@ DEFAULTS = {
                     "baudrate": 9600, "lan_ip": "", "lan_port": 9100,
                     "driver_name": "Godex EZ520+", "logo": "drivers/G8_Label.bmp"},
         # MX Component: station_number = Logical Station trong Communication Settings Utility;
-        # password = remote password của PLC (nếu có); keepalive_s = chu kỳ đọc thử M10 (0 = tắt).
+        # password = remote password của PLC (nếu có); keepalive_s = chu kỳ đọc thử M10 (0 = tắt);
+        # com_port = cổng COM đã đặt cho Logical Station, chỉ để thẻ Cài đặt không gán trùng.
         "plc": {"enabled": True, "station_number": 0, "password": "", "keepalive_s": 5,
-                "progid": ""},
+                "progid": "", "com_port": ""},
     },
     "servers": {
         "pallet_done_url": "http://192.168.110.189:8060/identify-service/ids/pallet_identify_done",
@@ -90,6 +92,31 @@ def save(patch):
             json.dump(cfg, f, ensure_ascii=False, indent=2)
         os.replace(tmp, CONFIG_PATH)
         return cfg
+
+
+DEVICE_NAMES = {"scale": "Cân", "barcode": "Đầu đọc", "printer": "Máy in", "plc": "PLC"}
+
+
+def com_ports(devices):
+    """{thiết bị: cổng COM} của các thiết bị đang dùng cổng COM (bỏ cổng None)."""
+    d = devices
+    ports = {"scale": d["scale"].get("port"), "barcode": d["barcode"].get("port")}
+    if str(d["printer"].get("connect_type", "")).upper() == "COM":
+        ports["printer"] = d["printer"].get("com_port")
+    if d["plc"].get("enabled", True):
+        ports["plc"] = d["plc"].get("com_port")
+    return {k: str(v).strip().upper() for k, v in ports.items() if v and str(v).strip()}
+
+
+def com_conflict(devices):
+    """Câu báo lỗi nếu hai thiết bị cùng chọn một cổng COM, không trùng thì ''."""
+    seen = {}
+    for name, port in com_ports(devices).items():
+        if port in seen:
+            return "%s đang được chọn cho cả %s và %s." % (port, DEVICE_NAMES[seen[port]],
+                                                          DEVICE_NAMES[name])
+        seen[port] = name
+    return ""
 
 
 def path(*parts):
