@@ -202,8 +202,9 @@ def build():
     s += table([
         ["Vùng", "Nội dung"],
         ["Cột trái (chữ to)", "Thùng hiện tại (đã làm / tổng), mã lệnh, mã pallet, vị trí, tên sản phẩm, "
-                     "quy cách, cân nặng, số pallet và số thùng hoàn thành, ngày in trên tem (NSX). "
-                     "Chữ dài tự xuống 2 dòng."],
+                     "quy cách, cân nặng, số pallet hoàn thành, <b>số thùng hoàn thành</b> (tính theo "
+                     "<b>lệnh</b>: tổng số thùng đã làm / tổng số thùng cần làm của cả lệnh, mọi "
+                     "pallet), ngày in trên tem (NSX). Chữ dài tự xuống 2 dòng."],
         ["Cột giữa", "Danh sách mã thùng của pallet đang làm (dòng xanh = thùng đang xử lý)."],
         ["Cột phải", "Khối lượng cân; ô trạng thái lớn <b>STOP / RUN / OK / NG</b>; bộ đếm "
                      "<b>Đạt</b> / <b>Sai</b> (nút <i>Đặt lại bộ đếm</i> để về 0)."],
@@ -223,8 +224,9 @@ def build():
         "Máy tự làm: <b>CÂN SẢN PHẨM...</b> → <b>ĐANG IN TEM...</b> → dán tem đúng vị trí cho "
         "đầu đọc → <b>ĐANG ĐỌC MÃ VẠCH...</b> Số to ở góc trên tem (cạnh logo) là "
         "<b>số thứ tự của thùng trong pallet</b> (1, 2, 3 …), giống cột STT trong danh sách thùng. "
-        "Tem gồm: giờ + ngày in (trên mã QR), tên sản phẩm (2 dòng), mã pallet, mã lệnh, "
-        "<b>NSX</b> (ngày sản xuất) và <b>mã định danh</b> ở dải dưới cùng.",
+        "Tem gồm: giờ in (trên mã QR, không in ngày in), tên sản phẩm (chữ to, in đậm, tối đa "
+        "3 dòng), mã pallet, mã lệnh, <b>NSX</b> (ngày sản xuất) và <b>mã định danh</b> ở dải "
+        "dưới cùng – đây là mã WMS gửi xuống, cũng chính là nội dung mã QR.",
         "Thùng đạt: ô lớn <font color='#1e8a1e'><b>OK</b></font>, đèn xanh. Lấy thùng ra khỏi cân; "
         "khi thấy <b>SẴN SÀNG CHO SẢN PHẨM MỚI</b> thì đặt thùng tiếp theo.",
         "Đủ thùng của pallet: thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "

@@ -78,7 +78,7 @@ def check(name, fn):
 # ---------------------------------------------------------------- kiểm tra đơn vị
 def unit_tests():
     from app.devices.scale import parse_weight
-    from app.devices.printer_godex import LEFT_W, wrap2
+    from app.devices.printer_godex import CHAR_W, LEFT_W, NAME_BOX, name_lines, wrap_name
     from app.engine import field, fmt_date, parse_carton
 
     def t_scale():
@@ -103,18 +103,20 @@ def unit_tests():
         assert fmt_date("18/09/2026") == "18/09/2026" and fmt_date(None) == ""
 
     def t_label_name():
-        name = "Bóng Led trụ nhôm T60,model T60-140/001 (60T hoặc 24/7)"
-        h, lines = wrap2(name)
-        assert len(lines) == 2 and " ".join(lines) == name, (h, lines)
-        assert all(len(x) * h * 0.55 <= LEFT_W for x in lines), (h, lines)
-        assert wrap2("SP ngắn") == (24, ["SP ngắn"])
-        h, lines = wrap2("X" * 200)
-        assert len(lines) == 2 and lines[1].endswith("…"), lines
-        assert wrap2("") == (24, [])
+        name = "Bóng Led trụ nhôm T60,model T60-140/G01 (6c/T hoặc 24c/T)"
+        h, lines = wrap_name(name)
+        assert h >= 24 and len(lines) == 3 and " ".join(lines) == name, (h, lines)
+        assert all(len(x) * h * CHAR_W <= LEFT_W for x in lines), (h, lines)
+        assert len(lines) * (h + 3) <= NAME_BOX + 3, (h, lines)
+        assert name_lines(32) == 2 and name_lines(24) == 3
+        assert wrap_name("SP ngắn") == (32, ["SP ngắn"])
+        h, lines = wrap_name("X" * 200)
+        assert len(lines) == 3 and lines[2].endswith("…"), lines
+        assert wrap_name("") == (32, [])
 
     check("Phân tích bản tin cân (g / kg / rác)", t_scale)
     check("Ngày sản xuất từ lệnh đổi về dd/mm/yyyy", t_mfg_fmt)
-    check("Tem: tên sản phẩm dài chia tối đa 2 dòng", t_label_name)
+    check("Tem: tên sản phẩm chữ to, chia tối đa 3 dòng", t_label_name)
     check("Tách mã thùng từ Carton_List", t_carton)
     check("Đọc trường không phân biệt hoa thường", t_field)
     check("Driver cân RS232: đọc luồng, mất tín hiệu, tự mở lại cổng, đóng sạch", t_serial_scale)
@@ -535,6 +537,8 @@ def e2e_tests(env):
             assert http(APP + "/api/identify", {})[1]["ok"]
             wait(lambda: state()["pallets"][0] == pallet + 1 or not state()["has_order"], 15,
                  "pallet %d xong" % (pallet + 1))
+            if pallet == 0:     # số thùng hoàn thành tính theo lệnh: 3 thùng xong / 6 thùng của lệnh
+                assert state()["order"] == [3, 6], state()["order"]
         wait(lambda: not state()["running"], 15, "tự STOP khi hết lệnh")
         assert state()["message"] == "ĐÃ HOÀN TẤT LỆNH SẢN XUẤT", state()["message"]
         got = http(SIMU + "/sim/state")[1]["received"]

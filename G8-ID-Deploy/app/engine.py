@@ -1288,15 +1288,23 @@ class Engine:
             done = sum(1 for r in rows if r["status"] >= 1)
             c["carton"] = [done, len(rows) or p.get("ctn", 0)]
             key = p.get("po_key")
+            # Số thùng hoàn thành tính theo LỆNH: thùng đã làm / tổng thùng cần làm của mọi
+            # pallet thuộc lệnh (đang chờ / đang làm + đã xong). Pallet nạp lại từ lịch sử chỉ
+            # tính một lần (theo bản đang chạy); lịch sử chỉ lấy lần xong mới nhất mỗi pallet.
             act = list(d.pallets.find({"po_key": key}, {"pallet_id": 1, "carton_count": 1}))
-            his = list(d.pallets_his.find({"po_key": key, "status": "DONE"},
-                                          {"carton_ok": 1}).limit(5000))
-            others = [a["pallet_id"] for a in act if a["pallet_id"] != p["pallet_id"]]
+            act_ids = {a["pallet_id"] for a in act}
+            his = {}
+            for h in d.pallets_his.find({"po_key": key, "status": "DONE"},
+                                        {"pallet_id": 1, "carton_ok": 1, "carton_count": 1})                    .sort("done_at", -1).limit(5000):
+                if h["pallet_id"] not in act_ids:
+                    his.setdefault(h["pallet_id"], h)
+            his = list(his.values())
+            others = [i for i in act_ids if i != p["pallet_id"]]
             other_ok = d.parcels.count_documents({"pallet_id": {"$in": others},
                                                   "status": {"$gte": 1}}) if others else 0
             c["order"] = [done + other_ok + sum(h.get("carton_ok", 0) for h in his),
                           sum(a.get("carton_count", 0) for a in act) +
-                          sum(h.get("carton_ok", 0) for h in his)]
+                          sum(h.get("carton_count") or h.get("carton_ok", 0) for h in his)]
             c["pallets"] = [len(his), len(his) + len(act)]
             pos = self.settings["positions"]
             c["pos"] = pos.index(p.get("location")) if p.get("location") in pos[:3] else -1

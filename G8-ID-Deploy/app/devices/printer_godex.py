@@ -1,8 +1,8 @@
 """Máy in tem Godex qua thư viện EZio (EZio64.dll / EZio32.dll) - đúng driver của bản cũ.
 
-Tem thùng 70x40 mm (560x320 điểm, 8 điểm/mm), bố cục từ bản 2.2.0:
-  khu 1 (trên mã QR): giờ + ngày in tem
-  cột trái: logo, số thứ tự thùng, tên sản phẩm (tối đa 2 dòng), mã pallet, mã lệnh, NSX
+Tem thùng 70x40 mm (560x320 điểm, 8 điểm/mm), bố cục từ bản 2.3.0:
+  khu 1 (trên mã QR): giờ in tem (không in ngày in - ngày trên tem chỉ là NSX)
+  cột trái: logo, số thứ tự thùng, tên sản phẩm (chữ đậm, tối đa 3 dòng), mã pallet, mã lệnh, NSX
   khu 2 (dải dưới cùng): mã định danh
 Mọi lệnh gọi DLL đi qua một khoá để không gọi chồng nhau.
 """
@@ -19,20 +19,27 @@ log = logging.getLogger("device.printer")
 
 LABEL_W_MM, LABEL_H_MM, GAP_MM = 70, 40, 3
 SPEED_IPS, DARKNESS = 4, 10
-FW_EXTRALIGHT, FW_SEMIBOLD, FW_HEAVY = 200, 600, 900
+FW_EXTRALIGHT, FW_SEMIBOLD, FW_BOLD, FW_HEAVY = 200, 600, 700, 900
 SEQ_X, SEQ_Y, SEQ_H = 125, 18, 64      # số thứ tự thùng: chữ to, cạnh logo, trái mã QR
 QR_X, QR_Y, QR_MUL = 300, 36, 9        # mã QR (bản 25 ô = 225 điểm) chừa chỗ khu 1 và khu 2
-STAMP_X, STAMP_Y, STAMP_H = 300, 8, 20  # khu 1: giờ + ngày in
+STAMP_X, STAMP_Y, STAMP_H = 300, 8, 20  # khu 1: giờ in
 LEFT_X, LEFT_W = 10, 282               # cột chữ bên trái mã QR
-NAME_Y, NAME_GAP = 88, 28              # tên sản phẩm: 2 dòng
-NAME_SIZES = (24, 22, 20, 18)          # cỡ chữ tên SP: lấy cỡ lớn nhất còn vừa 2 dòng
-LINE_Y, LINE_GAP, LINE_H = 150, 36, 22  # mã pallet / mã lệnh / NSX
+NAME_Y, NAME_BOX, NAME_LEAD = 86, 96, 3  # tên sản phẩm: khung cao 96 điểm, dòng cách dòng h+3
+NAME_SIZES = (32, 30, 28, 26, 24, 22, 20, 18)  # cỡ chữ tên SP: lấy cỡ lớn nhất còn vừa khung
+NAME_MAX_LINES = 3
+LINE_Y, LINE_GAP, LINE_H = 186, 32, 22  # mã pallet / mã lệnh / NSX
 CODE_Y, CODE_H = 286, 28               # khu 2: mã định danh, cả chiều ngang tem
 CHAR_W = 0.55                          # bề rộng trung bình 1 ký tự Arial ~ 0,55 x cỡ chữ
 
 
-def wrap2(text, width=LEFT_W, sizes=NAME_SIZES):
-    """Chia tên sản phẩm thành tối đa 2 dòng vừa `width` điểm; trả (cỡ chữ, [dòng])."""
+def name_lines(h):
+    """Số dòng tên SP vừa khung với cỡ chữ h."""
+    return max(1, min(NAME_MAX_LINES, (NAME_BOX + NAME_LEAD) // (h + NAME_LEAD)))
+
+
+def wrap_name(text, width=LEFT_W, sizes=NAME_SIZES):
+    """Chia tên sản phẩm thành các dòng vừa `width` điểm, số dòng theo name_lines();
+    trả (cỡ chữ, [dòng]) với cỡ chữ lớn nhất còn vừa khung."""
     words = str(text or "").split()
     for h in sizes:
         cap = max(1, int(width / (h * CHAR_W)))
@@ -53,10 +60,11 @@ def wrap2(text, width=LEFT_W, sizes=NAME_SIZES):
                 cur = w
         if cur:
             lines.append(cur)
-        if len(lines) <= 2:
+        if len(lines) <= name_lines(h):
             return h, lines
-    rest = " ".join(lines[1:])
-    return sizes[-1], [lines[0], rest[:cap - 1] + "…" if len(rest) > cap else rest]
+    n = name_lines(sizes[-1])
+    rest = " ".join(lines[n - 1:])
+    return sizes[-1], lines[:n - 1] + [rest[:cap - 1] + "…" if len(rest) > cap else rest]
 
 
 class GodexPrinter:
@@ -196,7 +204,7 @@ class GodexPrinter:
                 return False
             try:
                 dll = self._dll
-                stamp = datetime.datetime.now().strftime("%Hh%Mp%Ss %d/%m/%Y")
+                stamp = datetime.datetime.now().strftime("%Hh%Mp%Ss")
                 self._begin(dll)
                 logo = config.path(self.cfg.get("logo") or "drivers/G8_Label.bmp")
                 if os.path.exists(logo):
@@ -205,9 +213,9 @@ class GodexPrinter:
                     self._text(dll, SEQ_X, SEQ_Y, SEQ_H, str(seq), FW_HEAVY)
                 dll.ecTextOutR(STAMP_X, STAMP_Y, STAMP_H, b"Arial", stamp.encode("mbcs"), 0,
                                FW_SEMIBOLD, 0)
-                h, name = wrap2(item_name)
+                h, name = wrap_name(item_name)
                 for i, line in enumerate(name):
-                    self._text(dll, LEFT_X, NAME_Y + i * NAME_GAP, h, line, FW_SEMIBOLD)
+                    self._text(dll, LEFT_X, NAME_Y + i * (h + NAME_LEAD), h, line, FW_BOLD)
                 for i, line in enumerate(("Ma Pallet : " + str(pallet_code),
                                           "Ma Lenh   : " + str(wh_code),
                                           "NSX       : " + str(mfg_date))):

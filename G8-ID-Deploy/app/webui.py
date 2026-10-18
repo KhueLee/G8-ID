@@ -347,7 +347,8 @@ body { font-family: Arial, sans-serif; background: #ccc; }
 .top { display: flex; align-items: center; gap: 2mm; height: 9mm; }
 .logo { font-weight: 900; font-size: 4mm; color: #000; }
 .seq { font-size: 8mm; font-weight: 900; }
-.name { font-size: 2.2mm; line-height: 1.2; height: 5.4mm; overflow: hidden; margin: .6mm 0 .4mm; }
+.name { font-size: 3mm; font-weight: 700; line-height: 1.12; height: 10.1mm; overflow: hidden;
+        margin: .4mm 0 .6mm; }
 .r { text-align: center; }
 .stamp { font-size: 2.3mm; font-weight: 600; }
 .r svg { width: 28mm; height: 28mm; }
@@ -362,7 +363,7 @@ def label_page(data):
         import segno
     except ImportError:
         segno = None
-    stamp = datetime.datetime.now().strftime("%Hh%Mp%Ss %d/%m/%Y")
+    stamp = datetime.datetime.now().strftime("%Hh%Mp%Ss")
     e = html.escape
     out = []
     for r in data["rows"]:
