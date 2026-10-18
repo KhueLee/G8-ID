@@ -325,17 +325,24 @@ def build():
         ["Mục", "Cách dùng"],
         ["Số thứ tự bàn định danh", "Số của bàn này (1–999). Hiện ở góc đồng hồ trên thanh đầu "
                                     "(vd <i>ST02 · Bàn 3 · AUTO</i>) và ở thẻ Thông số."],
-        ["Cổng (cân, đầu đọc, máy in, PLC)",
-         "Bấm vào ô để sổ danh sách: chỉ có các cổng COM <b>đang cắm trên máy</b>, kèm tên thiết "
-         "bị, và <b>None</b> (không dùng thiết bị đó). Cổng ghi <i>KHÔNG CÓ TRÊN MÁY</i> là cổng "
-         "cũ đã mất (cáp rút ra / đổi lỗ USB / driver lỗi) – phải chọn lại."],
+        ["Tự dò (mặc định)",
+         "Mỗi lần mở phần mềm và mỗi lần lưu, máy tự tìm cổng theo tên trong Windows: "
+         "<b>cân = USB Serial Port</b>, <b>đầu đọc = USB Serial Device</b>, <b>PLC = USB-SERIAL "
+         "CH340</b>. Máy in đi USB, không cần cổng COM. Ô hiện <i>Tự dò … → COM5</i> là đã tìm ra. "
+         "Không tìm thấy: Trang chủ báo <b>CHƯA TÌM THẤY CỔNG COM</b>, ô ghi <i>KHÔNG THẤY</i> – "
+         "kiểm tra cáp, bấm Dò lại cổng COM hoặc chọn cổng thủ công."],
+        ["Chọn cổng thủ công",
+         "Dùng cho máy đặc biệt cắm thiết bị ở cổng khác. Bấm vào ô, chọn đúng cổng (danh sách chỉ "
+         "có cổng <b>đang cắm trên máy</b>, kèm tên) hoặc <b>None</b> (không dùng thiết bị đó). "
+         "Đã chọn tay thì phần mềm giữ cổng đó, không tự dò nữa; muốn dò lại thì chọn <i>Tự dò</i>. "
+         "Cổng ghi <i>KHÔNG CÓ TRÊN MÁY</i> là cổng cũ đã mất – phải chọn lại."],
         ["Cổng bị mờ, ghi [đang dùng: …]",
          "Cổng đó đã gán cho thiết bị khác. Mỗi cổng chỉ cho <b>một</b> thiết bị; muốn chuyển, "
          "đặt thiết bị kia về None trước. Lưu mà còn trùng cổng sẽ bị báo lỗi."],
         ["Dò lại cổng COM", "Bấm sau khi cắm thêm / cắm lại cáp để danh sách cổng cập nhật."],
         ["Cổng COM của Logical Station (PLC)",
-         "Cổng của PLC đặt trong <i>Communication Settings Utility</i> (MX Component). Chọn đúng "
-         "cổng đó ở đây để phần mềm không cho cân / đầu đọc dùng trùng."],
+         "Tự dò ra cổng cáp CH340. Cổng thật của PLC đặt trong <i>Communication Settings "
+         "Utility</i> (MX Component): Logical Station phải dùng <b>đúng cổng hiện ở đây</b>."],
     ], [48, 126])
     s += [CondPageBreak(55 * mm), P("<b>Nút Kiểm tra</b> (dưới mỗi thiết bị) thử ngay cổng đang chọn, chưa cần lưu. Chữ "
             "<font color='#1e8a1e'><b>xanh – ĐẠT</b></font> là đúng thiết bị; chữ "
@@ -348,7 +355,7 @@ def build():
         ["Kiểm tra máy in", "Mở kết nối máy in.", "Mở được. Muốn chắc thì bấm <b>In thử</b>."],
         ["Kiểm tra PLC", "Mở / đóng Logical Station.", "Nối được PLC."],
     ], [34, 72, 68])
-    s += box(["<b>Không biết thiết bị nào ở cổng nào?</b> Chọn lần lượt từng cổng cho cân, bấm "
+    s += box(["<b>Tự dò không ra / máy đặc biệt?</b> Chọn lần lượt từng cổng cho cân, bấm "
               "<b>Kiểm tra cân</b> tới khi ĐẠT; làm tương tự với đầu đọc. Xong bấm <b>Lưu + kết "
               "nối lại thiết bị</b>.",
               "Không thấy cổng nào của cân / đầu đọc trong danh sách: kiểm tra cáp, bấm <b>Dò lại "

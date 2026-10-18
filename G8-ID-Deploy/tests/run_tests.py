@@ -105,6 +105,7 @@ def unit_tests():
     check("Driver PLC MX Component (control giả): Open, đèn M0/M1/M2/M10, mất nối, Close", t_plc_mx)
     check("Cổng COM: None không mở cổng, chặn hai thiết bị trùng cổng", t_com_none_conflict)
     check("Kiểm tra thiết bị ở thẻ Cài đặt: nhận ra cân / đầu đọc / sai cổng", t_probe)
+    check("Tự dò cổng COM theo tên Windows (trạm ST02), thiếu / trùng -> None", t_portmap)
 
 
 class FakeSerial:
@@ -217,6 +218,32 @@ def t_com_none_conflict():
     devices["printer"]["com_port"] = ""
     devices["scale"]["port"] = devices["barcode"]["port"] = ""
     assert config.com_conflict(devices) == "", "nhiều thiết bị None không tính là trùng"
+
+
+def t_portmap():
+    import copy
+    from app import config
+    from app.devices import portmap
+    st02 = [{"port": "COM1", "desc": "Communications Port (COM1)"},
+            {"port": "COM3", "desc": "USB Serial Device (COM3)"},
+            {"port": "COM4", "desc": "USB-SERIAL CH340 (COM4)"},
+            {"port": "COM5", "desc": "USB Serial Port (COM5)"}]
+    dev = copy.deepcopy(config.DEFAULTS["devices"])
+    got = portmap.detect(dev, st02)
+    assert got == {"scale": ("COM5", ""), "barcode": ("COM3", ""), "plc": ("COM4", "")}, got
+    dev["scale"].update(auto=False, port="COM1")           # máy đặc biệt: cân chọn tay COM1
+    got = portmap.detect(dev, st02)
+    assert "scale" not in got and got["barcode"] == ("COM3", ""), got
+    dev["barcode"].update(auto=False, port="COM5")         # chọn tay chiếm cổng của mẫu khác
+    dev["scale"].update(auto=True)
+    got = portmap.detect(dev, st02)
+    assert got["scale"][0] == "" and "không thấy" in got["scale"][1], got
+    two = st02 + [{"port": "COM7", "desc": "USB Serial Port (COM7)"}]
+    dev["barcode"].update(auto=True)
+    got = portmap.detect(dev, two)
+    assert got["scale"][0] == "" and "COM5, COM7" in got["scale"][1], got
+    dev["plc"]["enabled"] = False
+    assert "plc" not in portmap.detect(dev, st02), "PLC tắt thì không dò"
 
 
 def t_probe():

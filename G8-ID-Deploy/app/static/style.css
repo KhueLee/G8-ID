@@ -116,3 +116,4 @@ table.grid button { margin: 0; padding: 3px 8px; }
 .testres { margin: 4px 0 10px; font-size: 13px; color: #aaa; white-space: pre-wrap; }
 .testres.good { color: #4caf50; } .testres.bad, .hint.bad { color: #ff5252; }
 .card select:disabled { opacity: .5; }
+#comhint { white-space: pre-line; }

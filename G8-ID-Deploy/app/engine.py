@@ -77,7 +77,8 @@ class Engine:
         self.mode = self._load_mode()
         self.settings = self._load_settings()
         self.db = db.data_db(self.manual)
-        self.dev = devices.build(self.cfg, self.sim_devices)
+        self.port_notes = {}
+        self._build_devices()
         self.running = False
         self._stop_evt = threading.Event()
         self._thread = None
@@ -101,6 +102,7 @@ class Engine:
         self._sim_seen = (0.0, False)
         self._testing = ""       # thiết bị đang được kiểm tra ở thẻ Cài đặt (driver tạm đóng)
         self.started_at = time.time()
+        self._port_msg()
 
     # ------------------------------------------------------------------ cấu hình
     @property
@@ -166,6 +168,22 @@ class Engine:
                                           "mode": self.mode, **data})
         except Exception:
             log.exception("Không ghi được event_log")
+
+    def _build_devices(self):
+        """Thiết bị thật: tự dò lại cổng COM (thiết bị bật Tự dò) trước khi mở cổng."""
+        from .devices import portmap
+        self.port_notes = {} if self.sim_devices else portmap.apply(self.cfg)
+        self.dev = devices.build(self.cfg, self.sim_devices)
+        self.dev.notes = self.port_notes
+
+    PORT_MSG = "CHƯA TÌM THẤY CỔNG COM: "
+
+    def _port_msg(self):
+        if self.port_notes:
+            names = ", ".join(config.DEVICE_NAMES[d].upper() for d in self.port_notes)
+            self._msg(self.PORT_MSG + "%s - HÃY CHỌN CỔNG THỦ CÔNG Ở THẺ CÀI ĐẶT" % names, RED)
+        elif self.message.startswith(self.PORT_MSG):
+            self._msg("", GRAY)
 
     def _msg(self, text, color=GRAY):
         if text != self.message:
@@ -510,11 +528,12 @@ class Engine:
             self.mode = mode
             self._save_mode()
             self.db = db.data_db(self.manual)
-            self.dev = devices.build(self.cfg, self.sim_devices)
+            self._build_devices()
             self.dev.start()
             self.light, self.weight, self._need_zero = "off", 0, False
             self.rcs, self.rcs_error = None, ""
             self._msg("ĐÃ CHUYỂN CHẾ ĐỘ " + mode, GRAY)
+            self._port_msg()
             self._dirty = True
             self.event("mode", mode=mode)
 
@@ -528,7 +547,8 @@ class Engine:
             log.info("Kết nối lại toàn bộ thiết bị theo cấu hình mới")
             self.dev.stop()
             self.cfg = config.get()
-            self.dev = devices.build(self.cfg, self.sim_devices)
+            self._build_devices()
+            self._port_msg()
             self.dev.start()
 
     def test_device(self, name, dcfg):

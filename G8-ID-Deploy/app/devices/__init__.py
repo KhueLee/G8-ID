@@ -7,6 +7,7 @@ log = logging.getLogger("device")
 class DeviceSet:
     def __init__(self, scale, barcode, printer, plc):
         self.scale, self.barcode, self.printer, self.plc = scale, barcode, printer, plc
+        self.notes = {}          # thiết bị -> lý do tự dò cổng không ra (hiện thay chi tiết lỗi)
 
     def all(self):
         return [self.scale, self.barcode, self.printer, self.plc]
@@ -24,8 +25,12 @@ class DeviceSet:
                 log.exception("Lỗi khi đóng %s", type(d).__name__)
 
     def status(self):
-        return {"plc": self.plc.status(), "printer": self.printer.status(),
-                "scale": self.scale.status(), "barcode": self.barcode.status()}
+        st = {"plc": self.plc.status(), "printer": self.printer.status(),
+              "scale": self.scale.status(), "barcode": self.barcode.status()}
+        for d, note in self.notes.items():
+            if not st[d]["ok"]:
+                st[d] = dict(st[d], detail="Tự dò: " + note)
+        return st
 
 
 def build(cfg, manual):

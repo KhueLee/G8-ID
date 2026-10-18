@@ -98,6 +98,11 @@ def main():
                 out("LỖI", "%s bị Windows nhận nhầm là chuột serial -> chạy tools\\fix_serial_mouse.bat"
                     % p.device)
         have = {p.device.upper() for p in ports}
+        from app.devices import portmap
+        found = portmap.detect(cfg["devices"], portmap.list_ports())
+        for name, (port, note) in found.items():
+            out("OK" if port else "CẢNH BÁO", "Tự dò %s: %s" % (name.upper(), port or note))
+            cfg["devices"][name][portmap.AUTO_KEYS[name]] = port
         for name in ("scale", "barcode"):
             want = str(cfg["devices"][name]["port"] or "").upper()
             if not want:

@@ -119,12 +119,19 @@ git stash pop
 
 | Thiết bị | Cấu hình (như bản cũ) |
 |---|---|
-| Cân | COM4, 9600 8N1. Quá 2 s không có số → “MẤT TÍN HIỆU CÂN”; quá 10 s → tự đóng/mở lại cổng. |
-| Đầu đọc Honeywell | COM3, 9600 8N1. Bật quét `16 54 0D`, tắt `16 55 0D`; thời gian chờ đọc mã ở thẻ Cài đặt (mặc định 5000 ms). |
+| Cân | Cổng *USB Serial Port* (cáp FTDI), 9600 8N1. Quá 2 s không có số → “MẤT TÍN HIỆU CÂN”; quá 10 s → tự đóng/mở lại cổng. |
+| Đầu đọc Honeywell | Cổng *USB Serial Device*, 9600 8N1. Bật quét `16 54 0D`, tắt `16 55 0D`; thời gian chờ đọc mã ở thẻ Cài đặt (mặc định 5000 ms). |
 | Máy in Godex EZ520+ | USB qua `drivers\EZio64.dll`. |
-| PLC Mitsubishi | MX Component 5, đèn tháp M0 đỏ / M1 xanh / M2 vàng / M10 tắt. |
+| PLC Mitsubishi | Cáp *USB-SERIAL CH340*, MX Component 5, đèn tháp M0 đỏ / M1 xanh / M2 vàng / M10 tắt. |
 
 **Chọn cổng COM ở thẻ Cài đặt → Thiết bị**
+- **Tự dò** (mặc định): mỗi lần khởi động và mỗi lần *Lưu + kết nối lại*, phần mềm tìm cổng có tên
+  Windows (Device Manager → Ports) chứa mẫu `detect` trong `config.json`: cân = `USB Serial Port`,
+  đầu đọc = `USB Serial Device`, PLC = `CH340`. Số COM có đổi (cắm lỗ USB khác) thì vẫn tìm ra.
+  Không thấy, hoặc thấy nhiều cổng khớp, thì thiết bị để None, Trang chủ báo *CHƯA TÌM THẤY CỔNG
+  COM: …* và phải chọn cổng thủ công. Máy in Godex đi USB nên không dò cổng COM.
+- Máy đặc biệt dùng cổng khác: chọn thẳng một cổng (thủ công, `auto: false`); phần mềm giữ đúng
+  cổng đó, không dò nữa. Cổng chọn tay không bị thiết bị Tự dò lấy mất.
 - Ô *Cổng* chỉ liệt kê các cổng COM Windows đang thấy, kèm tên thiết bị, cộng thêm **None** (không
   dùng thiết bị đó, phần mềm không mở cổng). Cắm thêm cáp thì bấm *Dò lại cổng COM*. Cổng trong
   `config.json` mà không còn trên máy hiện là *KHÔNG CÓ TRÊN MÁY*.

@@ -158,27 +158,44 @@ async function loadSettings() {
   $('v-pallet_done_url').value = r.servers.pallet_done_url;
   document.querySelectorAll('.testres').forEach(e => { e.textContent = ''; e.className = 'testres'; });
   ports = r.ports;
-  fillPorts(Object.fromEntries(Object.keys(COM_SEL).map(d => [d, r.devices[d][COM_SEL[d].split('-').pop()] || ''])));
+  detectPat = Object.fromEntries(AUTO_DEV.map(d => [d, r.devices[d].detect || '']));
+  fillPorts(Object.fromEntries(Object.keys(COM_SEL).map(d => [d, { auto: r.devices[d].auto !== false, port: r.devices[d][COM_SEL[d].split('-').pop()] || '' }])));
 }
 
-// ---------- chọn cổng COM: chỉ cổng đang có trên máy + None, không cho hai thiết bị trùng cổng ----------
+// ---------- chọn cổng COM: Tự dò (theo tên cổng trong Windows) / None / cổng đang có, không cho trùng ----------
+const AUTO_DEV = ['scale', 'barcode', 'plc'];
+let detectPat = {};
 const comActive = d => d === 'printer' ? val('d-printer-connect_type') === 'COM' : d === 'plc' ? $('d-plc-enabled').checked : true;
+function preview() {
+  // Giống portmap.detect phía Python: cổng chọn tay giữ nguyên, thiết bị Tự dò lấy cổng khớp tên.
+  const taken = new Set(Object.keys(COM_SEL).filter(d => comActive(d) && val(COM_SEL[d]) !== 'AUTO' && val(COM_SEL[d])).map(d => val(COM_SEL[d]).toUpperCase()));
+  const out = {};
+  for (const d of AUTO_DEV) {
+    if (val(COM_SEL[d]) !== 'AUTO' || !comActive(d)) continue;
+    const pat = (detectPat[d] || '').toLowerCase();
+    const hits = ports.filter(p => pat && p.desc.toLowerCase().includes(pat) && !taken.has(p.port.toUpperCase())).map(p => p.port);
+    out[d] = hits.length === 1 ? { port: hits[0] } : { port: '', note: hits.length ? `có ${hits.length} cổng khớp (${hits.join(', ')})` : 'không thấy cổng' };
+    if (hits.length === 1) taken.add(hits[0].toUpperCase());
+  }
+  return out;
+}
+const portOf = (d, pv) => val(COM_SEL[d]) === 'AUTO' ? ((pv[d] || {}).port || '') : val(COM_SEL[d]);
 function fillPorts(current) {
   for (const d in COM_SEL) {
-    const sel = $(COM_SEL[d]), want = String(current[d] || '').trim().toUpperCase();
+    const sel = $(COM_SEL[d]), cur = current[d] || {}, want = String(cur.port || '').trim().toUpperCase();
     const opts = [['', 'None (không dùng)']].concat(ports.map(p => [p.port, `${p.port} — ${p.desc}`]));
     const have = opts.find(([v]) => v && v.toUpperCase() === want);
     if (want && !have) opts.splice(1, 0, [want, `${want} — KHÔNG CÓ TRÊN MÁY`]);
+    if (AUTO_DEV.includes(d)) opts.unshift(['AUTO', 'Tự dò']);
     sel.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}" data-label="${esc(t)}">${esc(t)}</option>`).join('');
-    sel.value = have ? have[0] : want;
+    sel.value = cur.auto && AUTO_DEV.includes(d) ? 'AUTO' : have ? have[0] : want;
   }
-  $('comhint').textContent = 'Cổng COM đang có trên máy: ' + (ports.map(p => `${p.port} (${p.desc})`).join(', ') || 'không có');
   markTaken();
 }
 function markTaken() {
-  const used = {}, clash = [];
+  const pv = preview(), used = {}, clash = [], miss = [];
   for (const d in COM_SEL) {
-    const p = val(COM_SEL[d]).toUpperCase();
+    const p = portOf(d, pv).toUpperCase();
     if (!comActive(d) || !p) continue;
     if (used[p]) clash.push(`${p}: ${DEV_NAME[used[p]]} và ${DEV_NAME[d]}`); else used[p] = d;
   }
@@ -186,25 +203,41 @@ function markTaken() {
     const sel = $(COM_SEL[d]);
     sel.disabled = !comActive(d);
     for (const o of sel.options) {
+      if (o.value === 'AUTO') {
+        const r = pv[d];
+        o.textContent = `Tự dò "${detectPat[d] || ''}"` + (!r ? '' : ' → ' + (r.port || 'KHÔNG THẤY, chọn cổng thủ công'));
+        if (r && !r.port) miss.push(`${DEV_NAME[d]} (${r.note} "${detectPat[d] || ''}")`);
+        continue;
+      }
       const by = o.value && used[o.value.toUpperCase()], taken = by && by !== d && o.value !== sel.value;
       o.disabled = !!taken;
       o.textContent = o.dataset.label + (taken ? `  [đang dùng: ${DEV_NAME[by]}]` : '');
     }
   }
+  const lines = ['Cổng COM đang có trên máy: ' + (ports.map(p => `${p.port} (${p.desc})`).join(', ') || 'không có')];
+  if (miss.length) lines.push('TỰ DÒ KHÔNG RA: ' + miss.join('; ') + ' — kiểm tra cáp, bấm Dò lại cổng COM hoặc chọn cổng thủ công.');
+  if (clash.length) lines.push('TRÙNG CỔNG — ' + clash.join('; ') + '. Đổi một thiết bị sang cổng khác hoặc None.');
   const h = $('comhint');
-  h.classList.toggle('bad', clash.length > 0);
-  if (clash.length) h.textContent = 'TRÙNG CỔNG — ' + clash.join('; ') + '. Đổi một thiết bị sang cổng khác hoặc None.';
+  h.textContent = lines.join('\n');
+  h.classList.toggle('bad', miss.length + clash.length > 0);
 }
 document.addEventListener('change', e => { if (e.target.classList.contains('comsel') || ['d-printer-connect_type', 'd-plc-enabled'].includes(e.target.id)) markTaken(); });
+const curPorts = () => Object.fromEntries(Object.keys(COM_SEL).map(d => [d, val(COM_SEL[d]) === 'AUTO' ? { auto: true, port: '' } : { auto: false, port: val(COM_SEL[d]) }]));
 async function refreshPorts() {
   const r = await api('/api/ports');
   if (!r.ok) return alertBox(r.error, 'LỖI');
   ports = r.ports;
-  fillPorts(Object.fromEntries(Object.keys(COM_SEL).map(d => [d, val(COM_SEL[d])])));
+  fillPorts(curPorts());
 }
 function formDevice(d) {
-  const o = {};
-  D_FIELDS[d].forEach(k => { const e = $(`d-${d}-${k}`); o[k] = e.type === 'checkbox' ? e.checked : e.type === 'number' ? Number(e.value) : e.value.trim(); });
+  const o = {}, pv = preview();
+  D_FIELDS[d].forEach(k => {
+    const e = $(`d-${d}-${k}`);
+    if (e.classList.contains('comsel')) {
+      if (AUTO_DEV.includes(d)) o.auto = e.value === 'AUTO';
+      o[k] = portOf(d, pv);
+    } else o[k] = e.type === 'checkbox' ? e.checked : e.type === 'number' ? Number(e.value) : e.value.trim();
+  });
   return o;
 }
 async function testDevice(d, btn) {

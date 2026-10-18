@@ -165,7 +165,8 @@ def build_ui(engine, on_quit):
     def get_settings():
         cfg = config.get()
         return {"settings": engine.settings, "devices": cfg["devices"], "servers": cfg["servers"],
-                "desk_no": cfg.get("desk_no", 1), "mode": engine.mode, "ports": _ports()}
+                "desk_no": cfg.get("desk_no", 1), "mode": engine.mode, "ports": _ports(),
+                "port_notes": engine.port_notes}
 
     @app.get("/api/ports")
     @guard
@@ -265,13 +266,8 @@ def build_ui(engine, on_quit):
 
 
 def _ports():
-    try:
-        from serial.tools import list_ports
-        ports = sorted(list_ports.comports(),
-                       key=lambda p: (len(p.device), p.device))  # COM2 trước COM10
-        return [{"port": p.device, "desc": p.description, "hwid": p.hwid} for p in ports]
-    except Exception:
-        return []
+    from .devices import portmap
+    return portmap.list_ports()
 
 
 def build_order_server(engine):

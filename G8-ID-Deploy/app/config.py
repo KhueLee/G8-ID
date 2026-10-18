@@ -20,9 +20,11 @@ DEFAULTS = {
               "event_log_days": 30, "history_max_docs": 300000},
     "log": {"dir": "logs", "level": "INFO", "keep_days": 30, "raw_device": False},
     "devices": {
-        "scale": {"port": "COM4", "baudrate": 9600, "bytesize": 8, "parity": "N",
+        # auto = mỗi lần khởi động / lưu cấu hình tự tìm cổng có tên Windows chứa `detect`
+        # (Device Manager → Ports); auto = false thì dùng đúng `port` đã chọn tay.
+        "scale": {"auto": True, "detect": "USB Serial Port", "port": "COM4", "baudrate": 9600, "bytesize": 8, "parity": "N",
                   "stopbits": 1, "stale_s": 2.0, "reopen_s": 10.0},
-        "barcode": {"port": "COM3", "baudrate": 9600, "bytesize": 8, "parity": "N",
+        "barcode": {"auto": True, "detect": "USB Serial Device", "port": "COM3", "baudrate": 9600, "bytesize": 8, "parity": "N",
                     "stopbits": 1},
         "printer": {"connect_type": "USB", "usb_name": "", "com_port": "COM5",
                     "baudrate": 9600, "lan_ip": "", "lan_port": 9100,
@@ -31,7 +33,7 @@ DEFAULTS = {
         # password = remote password của PLC (nếu có); keepalive_s = chu kỳ đọc thử M10 (0 = tắt);
         # com_port = cổng COM đã đặt cho Logical Station, chỉ để thẻ Cài đặt không gán trùng.
         "plc": {"enabled": True, "station_number": 0, "password": "", "keepalive_s": 5,
-                "progid": "", "com_port": ""},
+                "progid": "", "com_port": "", "auto": True, "detect": "CH340"},
     },
     "servers": {
         "pallet_done_url": "http://192.168.110.189:8060/identify-service/ids/pallet_identify_done",
