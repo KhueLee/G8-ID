@@ -47,18 +47,11 @@
     <div class="row"><span>Pallet hoàn thành:</span><b id="f-pallets">0/0</b></div>
     <div class="row"><span>Số thùng hoàn thành:</span><b id="f-order">0/0</b></div>
     <div class="row"><span>Ngày in trên tem:</span><b id="f-date">N/A</b></div>
-    <div class="logbox" id="logbox"></div>
-    <div class="positions">
-      <div class="pos" id="pos0"><small>VỊ TRÍ 01</small><b></b></div>
-      <div class="pos" id="pos1"><small>VỊ TRÍ 02</small><b></b></div>
-      <div class="pos" id="pos2"><small>VỊ TRÍ 03</small><b></b></div>
-    </div>
   </div>
   <div class="center">
     <div class="tablewrap">
-      <table id="list"><thead><tr><th style="width:10%">STT</th><th style="width:30%">Mã định danh</th><th style="width:30%">Trạng thái</th><th>Mã Pallet</th></tr></thead><tbody></tbody></table>
+      <table id="list"><thead><tr><th style="width:12%">STT</th><th style="width:42%">Mã định danh</th><th style="width:22%">Trạng thái</th><th>Mã Pallet</th></tr></thead><tbody></tbody></table>
     </div>
-    <div class="msgbar"><div class="arrow">&#10140;</div><div id="message"></div></div>
   </div>
   <div class="right">
     <div class="wbox"><div class="lbl">KHỐI LƯỢNG CÂN:</div><div id="weight">0 g</div></div>
@@ -66,19 +59,39 @@
     <button id="btnReset" class="reset">Đặt lại bộ đếm</button>
     <div class="cnt pass"><span>Đạt</span><span id="c-pass">0/0</span><span id="c-ppass">0.0%</span></div>
     <div class="cnt fail"><span>Sai</span><span id="c-fail">0/0</span><span id="c-pfail">0.0%</span></div>
+  </div>
+  <div class="bottom">
+    <div class="positions">
+      <div class="pos" id="pos0"><small>VỊ TRÍ 01</small><b></b></div>
+      <div class="pos" id="pos1"><small>VỊ TRÍ 02</small><b></b></div>
+      <div class="pos" id="pos2"><small>VỊ TRÍ 03</small><b></b></div>
+    </div>
+    <div class="msgbar"><div class="arrow">&#10140;</div><div id="message"></div></div>
     <div class="ctrl"><button id="btnStart" class="start">&#9654; Bắt đầu</button><button id="btnStop" class="stop">&#9632; Dừng</button></div>
   </div>
 </section>
 
 <section id="tab-settings" class="tab hidden page">
   <div class="cards">
-    <div class="card">
-      <h3>Chế độ chạy</h3>
-      <p>Hiện tại: <b id="s-mode">?</b></p>
-      <p class="hint">AUTO = thiết bị thật, dữ liệu sản xuất. MANUAL = nối công cụ mô phỏng (chay_mo_phong.bat), dữ liệu riêng. HYBRID = cân, đầu đọc, máy in, PLC thật tại bàn; chỉ WMS/WCS (gửi lệnh) và RCS (nhận pallet) là công cụ mô phỏng, dữ liệu riêng như MANUAL. Chỉ chuyển AUTO được khi cửa sổ chay_mo_phong.bat đã đóng.</p>
-      <button class="b" onclick="setMode('AUTO')">Chuyển AUTO</button>
-      <button class="b warn" onclick="setMode('MANUAL')">Chuyển MANUAL</button>
-      <button class="b warn" onclick="setMode('HYBRID')">Chuyển HYBRID</button>
+    <div class="stack">
+      <div class="card">
+        <h3>Chế độ chạy</h3>
+        <p>Hiện tại: <b id="s-mode">?</b></p>
+        <p class="hint">AUTO = thiết bị thật, dữ liệu sản xuất. MANUAL = nối công cụ mô phỏng (chay_mo_phong.bat), dữ liệu riêng. HYBRID = cân, đầu đọc, máy in, PLC thật tại bàn; chỉ WMS/WCS (gửi lệnh) và RCS (nhận pallet) là công cụ mô phỏng, dữ liệu riêng như MANUAL. Chỉ chuyển AUTO được khi cửa sổ chay_mo_phong.bat đã đóng.</p>
+        <button class="b" onclick="setMode('AUTO')">Chuyển AUTO</button>
+        <button class="b warn" onclick="setMode('MANUAL')">Chuyển MANUAL</button>
+        <button class="b warn" onclick="setMode('HYBRID')">Chuyển HYBRID</button>
+      </div>
+      <div class="card">
+        <h3>Cài đặt vận hành</h3>
+        <table class="kv"><tr><td>Lệnh hiện tại</td><td><b id="mf-po">-</b></td></tr>
+          <tr><td>NSX theo lệnh</td><td id="mf-order">-</td></tr>
+          <tr><td>Đang in trên tem</td><td><b id="mf-eff">-</b></td></tr></table>
+        <label class="chk"><input id="mf-on" type="checkbox"> Sửa ngày sản xuất</label>
+        <label>Ngày sản xuất in trên tem<input id="mf-date" type="date"></label>
+        <p class="hint" id="mf-hint">Bỏ tích = in ngày sản xuất theo lệnh. Lệnh mới về bàn luôn lấy ngày theo lệnh. Chỉ sửa được khi lệnh chưa định danh thùng / pallet nào.</p>
+        <button class="b ok" id="mf-save" onclick="saveMfg()">Lưu ngày sản xuất</button>
+      </div>
     </div>
     <div class="card">
       <h3>Thông số cân / pallet</h3>
@@ -127,27 +140,56 @@
       <button class="b" onclick="act('/api/print_manual',{text:val('m-print')},'IN THÀNH CÔNG')">In thử</button>
       <button class="b" onclick="act('/api/reprint',{},'Đã in lại tem')">In lại tem thùng gần nhất</button>
       <button class="b warn" onclick="reprintPallet('')">In lại toàn bộ tem pallet đang làm</button>
-      <p class="hint">In lại tem của mọi thùng đã đạt trong pallet. Pallet đã xong: thẻ Thông số → Lịch sử pallet → “In lại tem”. Bấm Dừng để hủy giữa chừng.</p>
+      <p class="hint">In lại tem của mọi thùng đã đạt trong pallet. Pallet đã xong hoặc in lại từng thùng: thẻ Thông số → chọn lệnh → “Tải mã định danh” → chọn thùng → “In lại mã định danh”. Bấm Dừng để hủy giữa chừng.</p>
       <h4>Đổi mật khẩu</h4>
       <label>Mật khẩu mới<input id="m-pass" type="password"></label>
       <button class="b" onclick="changePass()">Đổi mật khẩu</button>
       <h4>Phần mềm</h4>
       <button class="b danger" onclick="quitApp()">Thoát phần mềm</button>
     </div>
+    <div class="card wide">
+      <h3>Thông tin trạm</h3>
+      <div class="cards">
+        <div><h4>Trạm</h4><table class="kv" id="i-station"></table></div>
+        <div><h4>Kết nối</h4><table class="kv" id="i-dev"></table></div>
+        <div><h4>Cơ sở dữ liệu</h4><table class="kv" id="i-db"></table></div>
+      </div>
+    </div>
   </div>
 </section>
 
-<section id="tab-info" class="tab hidden page">
-  <div class="cards">
-    <div class="card"><h3>Trạm</h3><table class="kv" id="i-station"></table></div>
-    <div class="card"><h3>Kết nối</h3><table class="kv" id="i-dev"></table></div>
-    <div class="card"><h3>Cơ sở dữ liệu</h3><table class="kv" id="i-db"></table></div>
-    <div class="card wide"><h3>Hàng chờ pallet</h3><table class="grid" id="i-queue"></table></div>
-    <div class="card wide">
-      <h3>Lịch sử pallet</h3>
-      <div class="bar">Từ <input type="date" id="h-from"> đến <input type="date" id="h-to"> <input id="h-q" placeholder="Mã pallet / mã lệnh"> <button class="b" onclick="loadHistory()">Tìm</button></div>
-      <table class="grid" id="i-his"></table>
-      <table class="grid" id="i-his-parcels"></table>
+<section id="tab-info" class="tab hidden">
+  <div class="ts-top">
+    <label>Từ: <input type="date" id="h-from"></label>
+    <label>Đến: <input type="date" id="h-to"></label>
+    <label class="stk"><small>Mã pallet</small><input id="h-pallet"></label>
+    <label class="stk"><small>Mã lệnh</small><input id="h-po"></label>
+    <button class="xb tk" onclick="loadOrders()">Tìm kiếm</button>
+    <div class="ts-stats">Số lệnh đang thực hiện: <b id="st-active">0</b> &nbsp; Số lệnh đã qua: <b id="st-passed">0</b> &nbsp; Số thùng đã hoàn thành: <b id="st-cartons">0</b></div>
+  </div>
+  <div class="ts-body">
+    <div class="ts-left">
+      <fieldset class="grp"><legend>LỆNH ĐANG CHỜ (ĐANG THỰC HIỆN)</legend>
+        <div class="gwrap"><table class="dg" id="g-pending"></table></div>
+        <div class="gbtns">
+          <button class="xb cyan" onclick="pdfCurrent()">In PDF mã hiện tại</button>
+          <button class="xb green" onclick="fakeComplete()">Thành công ảo</button>
+          <button class="xb peach" onclick="pullNext()">Tải lệnh mới</button>
+          <button class="xb pink" onclick="deleteTask()">Xóa lệnh đang làm</button>
+          <button class="xb green" onclick="sendIdentify()">Gửi định danh</button>
+        </div>
+      </fieldset>
+      <fieldset class="grp"><legend>LỆNH ĐÃ HOÀN THÀNH (ĐÃ XÓA)</legend>
+        <div class="gwrap"><table class="dg" id="g-completed"></table></div>
+        <div class="gbtns"><button class="xb peach" onclick="reloadTask()">Thực hiện lại</button></div>
+      </fieldset>
+    </div>
+    <div class="ts-right">
+      <div class="ts-rhead"><span id="ps-total">Tổng số thùng trong pallet: 0</span>
+        <span><button class="xb cyan" onclick="loadParcels()">Tải mã định danh</button><button class="xb lav" onclick="reprintCodes()">In lại mã định danh</button></span></div>
+      <fieldset class="grp"><legend>DANH SÁCH MÃ ĐỊNH DANH TRONG PALLET <span id="ps-pallet"></span></legend>
+        <div class="gwrap"><table class="dg" id="g-parcels"></table></div>
+      </fieldset>
     </div>
   </div>
 </section>

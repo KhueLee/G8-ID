@@ -78,7 +78,8 @@ def check(name, fn):
 # ---------------------------------------------------------------- kiểm tra đơn vị
 def unit_tests():
     from app.devices.scale import parse_weight
-    from app.engine import field, parse_carton
+    from app.devices.printer_godex import LEFT_W, wrap2
+    from app.engine import field, fmt_date, parse_carton
 
     def t_scale():
         cases = {"ST,GS,+  1.234kg": 1234, "  300 g": 300, "US,NT,+0000.50 kg": 500, "0": 0,
@@ -96,7 +97,24 @@ def unit_tests():
         assert field({"palletID": "P1"}, "Pallet_ID", "palletID") == "P1"
         assert field({}, "x", default=7) == 7
 
+    def t_mfg_fmt():
+        assert fmt_date("2026-09-18") == "18/09/2026"
+        assert fmt_date("2026-09-18T00:00:00") == "18/09/2026"
+        assert fmt_date("18/09/2026") == "18/09/2026" and fmt_date(None) == ""
+
+    def t_label_name():
+        name = "Bóng Led trụ nhôm T60,model T60-140/001 (60T hoặc 24/7)"
+        h, lines = wrap2(name)
+        assert len(lines) == 2 and " ".join(lines) == name, (h, lines)
+        assert all(len(x) * h * 0.55 <= LEFT_W for x in lines), (h, lines)
+        assert wrap2("SP ngắn") == (24, ["SP ngắn"])
+        h, lines = wrap2("X" * 200)
+        assert len(lines) == 2 and lines[1].endswith("…"), lines
+        assert wrap2("") == (24, [])
+
     check("Phân tích bản tin cân (g / kg / rác)", t_scale)
+    check("Ngày sản xuất từ lệnh đổi về dd/mm/yyyy", t_mfg_fmt)
+    check("Tem: tên sản phẩm dài chia tối đa 2 dòng", t_label_name)
     check("Tách mã thùng từ Carton_List", t_carton)
     check("Đọc trường không phân biệt hoa thường", t_field)
     check("Driver cân RS232: đọc luồng, mất tín hiệu, tự mở lại cổng, đóng sạch", t_serial_scale)
@@ -288,7 +306,7 @@ def t_printer_dll():
     for fn in ("OpenUSB", "FindFirstUSB", "sendcommand", "ecTextOutRW", "Bar_QRcode", "putimage",
                "closeport"):
         assert hasattr(dll, fn), "DLL thiếu hàm " + fn
-    assert p.print_carton("X", "", "", "", 0) is False, "chưa nối máy in thì in phải trả lỗi"
+    assert p.print_carton("X", "", "", "", "") is False, "chưa nối máy in thì in phải trả lỗi"
 
 
 def t_plc_mx():
@@ -549,8 +567,8 @@ def e2e_tests(env):
         assert [x["type"] for x in labels] == ["carton"] * 3, labels
         assert [x["code"] for x in labels] == codes, labels
         assert all(x["pallet"] == pid for x in labels), labels
-        assert [x["weight"] for x in labels] == [x["weight"] for x in rows], \
-            "tem in lại phải ghi đúng khối lượng đã cân: %s" % labels
+        assert all("weight" not in x and x["mfg_date"] == time.strftime("%d/%m/%Y") for x in labels), \
+            "tem in lại: bỏ khối lượng, in NSX theo lệnh: %s" % labels
         # Máy in lỗi giữa chừng: dừng lại và báo đúng thùng
         sim_set(printer_fail=True)
         assert http(APP + "/api/reprint_pallet", {"pallet_id": pid})[1]["ok"]
@@ -561,6 +579,87 @@ def e2e_tests(env):
         assert not r["ok"] and "Không tìm thấy pallet" in r["error"], r
         r = http(APP + "/api/reprint_pallet", {})[1]
         assert not r["ok"] and "Chưa có lệnh sản xuất" in r["error"], r
+
+    def t_mfg_and_orders_tab():
+        o = order(2, 2)
+        p1, p2 = [d["Pallet_ID"] for d in o["info_detail"]]
+        stop()                                              # lệnh mới tự Bắt đầu
+        today = time.strftime("%d/%m/%Y")
+        m = http(APP + "/api/mfg")[1]["mfg"]
+        assert m["has_order"] and not m["manual"] and not m["locked"], m
+        assert m["order_date"] == m["effective"] == today, m
+        r = http(APP + "/api/mfg", {"enabled": True, "date": "31/02/2026"})[1]
+        assert not r["ok"] and "không hợp lệ" in r["error"], r
+        r = http(APP + "/api/mfg", {"enabled": True, "date": "01/02/2026"})[1]
+        assert r["ok"] and r["mfg"]["effective"] == "01/02/2026" and r["mfg"]["manual"], r
+        assert state()["pallet"]["mfg_date"] == "01/02/2026"
+        req = urllib.request.Request(APP + "/api/mfg", data=b"{}", method="POST",
+                                     headers={"Content-Type": "application/json", "X-Pass": "sai"})
+        try:
+            urllib.request.urlopen(req, timeout=5)
+            assert False, "sai mật khẩu vẫn sửa được NSX"
+        except urllib.error.HTTPError as e:
+            assert e.code == 403, e.code
+        t = time.strftime("%Y-%m-%d")
+        ords = http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]
+        assert [x["pallet_id"] for x in ords["pending"]] == [p1, p2], ords["pending"]
+        assert all(x["mfg_date"] == "01/02/2026" for x in ords["pending"])
+        assert ords["stats"]["active"] == 2, ords["stats"]
+        r = http(APP + "/api/identify", {"pallet_id": p1})[1]
+        assert not r["ok"] and r["title"] == "CHƯA ĐỦ SỐ LƯỢNG HÀNG!", r
+        # Tự Bắt đầu rồi Dừng ngay: pallet 1 có thể còn WAIT -> Tải lệnh mới đưa nó vào làm
+        r = http(APP + "/api/orders/pull_next", {})[1]
+        assert r.get("pallet_id") == p1 or "Đang có lệnh sản xuất đang chạy" in r.get("error", ""), r
+        assert http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]["pending"][0]["status"] == "PROCESSING"
+        r = http(APP + "/api/orders/pull_next", {})[1]
+        assert not r["ok"] and "Đang có lệnh sản xuất đang chạy" in r["error"], r
+        # Tem in ra mang NSX sửa tay; đã có thùng đạt thì khóa sửa NSX
+        start()
+        carton_ok(1)
+        wait(lambda: state()["carton"][0] == 1, 10, "1 thùng đạt")
+        stop()
+        last = http(SIMU + "/sim/state")[1]["labels"][-1]
+        assert last["mfg_date"] == "01/02/2026" and "weight" not in last, last
+        r = http(APP + "/api/mfg", {"enabled": False})[1]
+        assert not r["ok"] and "không sửa được" in r["error"], r
+        assert http(APP + "/api/mfg")[1]["mfg"]["locked"]
+        # Tải mã định danh + In lại mã định danh (chỉ thùng đã đạt)
+        ps = http(APP + "/api/orders/parcels?pallet=" + p1)[1]
+        assert (ps["done"], ps["total"]) == (1, 2), ps
+        c0, c1 = ps["rows"][0]["code"], ps["rows"][1]["code"]
+        assert ps["rows"][0]["mfg_date"] == "01/02/2026", ps["rows"][0]
+        r = http(APP + "/api/reprint_pallet", {"pallet_id": p1, "codes": [c0]})[1]
+        assert r["ok"] and r["total"] == 1, r
+        wait(job_done, 20, "in lại 1 tem")
+        assert http(SIMU + "/sim/state")[1]["labels"][-1]["code"] == c0
+        r = http(APP + "/api/reprint_pallet", {"pallet_id": p1, "codes": [c1]})[1]
+        assert not r["ok"] and "chưa cân / in đạt" in r["error"], r
+        # In PDF mã hiện tại: trang tem có QR của mọi thùng
+        with urllib.request.urlopen(APP + "/labels?pallet=" + p1, timeout=5) as g:
+            page = g.read().decode("utf-8")
+        assert c0 in page and c1 in page and page.count("<svg") == 2 and "01/02/2026" in page
+        # Thành công ảo: lưu lịch sử DONE, không gửi server
+        sent = len(http(SIMU + "/sim/state")[1]["received"])
+        r = http(APP + "/api/orders/fake_complete", {"pallet_id": p1})[1]
+        assert r["ok"], r
+        assert len(http(SIMU + "/sim/state")[1]["received"]) == sent, "thành công ảo không được gửi"
+        ords = http(APP + "/api/orders?from=%s&to=%s&pallet=%s" % (t, t, p1))[1]
+        assert ords["pending"] == [] and ords["completed"][0]["done_reason"] == "FAKE_COMPLETE", ords
+        hist = http(APP + "/api/orders/parcels?pallet=%s&key=%s" % (p1, ords["completed"][0]["key"]))[1]
+        assert (hist["done"], hist["total"]) == (1, 2), hist
+        # Tải lệnh mới -> Xóa lệnh đang làm -> Thực hiện lại
+        r = http(APP + "/api/orders/pull_next", {})[1]
+        assert r["ok"] and r["pallet_id"] == p2, r
+        r = http(APP + "/api/orders/delete", {"pallet_id": p2})[1]
+        assert r["ok"] and r["cancelled"] == [p2], r
+        assert not state()["has_order"]
+        ords = http(APP + "/api/orders?from=%s&to=%s&pallet=%s" % (t, t, p2))[1]
+        assert ords["completed"][0]["status"] == "CANCEL", ords["completed"]
+        assert http(APP + "/api/reload", {"pallet_id": p2})[1]["ok"]
+        ords = http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]
+        assert [x["pallet_id"] for x in ords["pending"]] == [p2], ords["pending"]
+        assert http(APP + "/api/orders/delete", {"pallet_id": p2})[1]["ok"]
+        assert not state()["has_order"]
 
     def t_ng_cases():
         order(1, 2)
@@ -758,6 +857,7 @@ def e2e_tests(env):
     check("Cổng nhận lệnh: 405 / Empty body / Invalid JSON / order_id invalid", t_order_api)
     check("Lệnh 2 pallet x 3 thùng: cân-in-đọc-định danh-lưu lịch sử", t_full_order)
     check("In lại toàn bộ tem pallet từ lịch sử; máy in lỗi giữa chừng", t_reprint_history)
+    check("Ngày sản xuất sửa tay + các nút thẻ Thông số như bản cũ", t_mfg_and_orders_tab)
     check("NG: sai khối lượng / in lỗi / đọc lại lần 2 / đọc sai 2 lần", t_ng_cases)
     check("Mất tín hiệu cân tự hồi phục; đầu đọc chờ tới khi có mã; Dừng không treo",
           t_scale_lost_and_stop)

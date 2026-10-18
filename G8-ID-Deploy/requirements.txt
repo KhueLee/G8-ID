@@ -4,3 +4,4 @@ flask>=3.0
 waitress>=3.0
 pywin32>=306
 comtypes>=1.4
+segno>=1.6

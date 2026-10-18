@@ -30,6 +30,22 @@ const alertBox = (text, title) => modal(title || 'THÔNG BÁO', text, [['OK', tr
 const confirmBox = (text, title, yes, no) => modal(title || 'XÁC NHẬN', text, [[yes || 'OK', true], [no || 'Cancel', false]]);
 
 // ---------- vẽ trang chủ ----------
+// Chữ dài thì xuống dòng, vẫn dài thì thu nhỏ dần cho vừa ô (tối đa `lines` dòng).
+function setFit(el, text, max, min, lines) {
+  text = String(text == null ? '' : text);
+  const key = text + '|' + el.clientWidth + 'x' + el.clientHeight;
+  if (el.dataset.fit === key) return;
+  el.dataset.fit = key;
+  el.innerHTML = `<span class="fit">${esc(text)}</span>`;
+  const sp = el.firstChild;
+  let f = max;
+  for (; f > min; f -= 2) {
+    el.style.fontSize = f + 'px';
+    const h = sp.getBoundingClientRect().height;
+    if (h <= el.clientHeight + 1 && h <= f * 1.15 * lines + 2) break;
+  }
+  el.style.fontSize = f + 'px';
+}
 function ind(id, ok) { const e = $(id); e.classList.toggle('ok', ok === true); e.classList.toggle('bad', ok === false); }
 function render(s) {
   state = s;
@@ -47,12 +63,10 @@ function render(s) {
 
   const p = s.pallet || {};
   $('curDone').textContent = s.carton[0]; $('curTotal').textContent = '/' + s.carton[1];
-  $('f-po').textContent = p.po || 'N/A'; $('f-pallet').textContent = p.pallet_id || 'N/A';
-  $('f-loc').textContent = p.location || 'N/A'; $('f-item').textContent = p.item || 'N/A';
-  $('f-spec').textContent = p.spec || 'N/A'; $('f-weight').textContent = p.weight || 'N/A';
-  $('f-pallets').textContent = s.pallets[0] + '/' + s.pallets[1];
-  $('f-order').textContent = s.order[0] + '/' + s.order[1];
-  $('f-date').textContent = p.mfg_date || s.date;
+  const rows = { 'f-po': p.po, 'f-pallet': p.pallet_id, 'f-loc': p.location, 'f-item': p.item, 'f-spec': p.spec,
+    'f-weight': p.weight, 'f-pallets': s.pallets[0] + '/' + s.pallets[1], 'f-order': s.order[0] + '/' + s.order[1],
+    'f-date': p.mfg_date || s.date };
+  for (const id in rows) setFit($(id), rows[id] || 'N/A', 28, 14, 2);
   for (let i = 0; i < 3; i++) {
     const e = $('pos' + i); e.classList.toggle('on', s.pos === i);
     e.querySelector('b').textContent = s.pos === i ? (s.positions[i] || '') : '';
@@ -69,7 +83,7 @@ function render(s) {
     const cur = document.querySelector('#list tr.cur'); if (cur) cur.scrollIntoView({ block: 'nearest' });
   }
 
-  const m = $('message'); m.textContent = s.message; m.className = 'c-' + s.msg_color;
+  const m = $('message'); setFit(m, s.message, 44, 18, 2); m.className = 'c-' + s.msg_color;
   $('weight').textContent = s.weight === null ? '--- g' : s.weight + ' g';
   const big = $('big'); big.textContent = s.big; big.className = 'big ' + s.big;
   const c = s.counter, pct = n => (c.total ? (n * 100 / c.total).toFixed(1) : '0.0') + '%';
@@ -78,9 +92,6 @@ function render(s) {
   const printing = !!(s.job && s.job.active);
   $('btnStart').disabled = s.running || printing; $('btnStart').innerHTML = s.running ? '&#9654; Đang chạy' : printing ? '&#9113; Đang in lại' : '&#9654; Bắt đầu';
 
-  const lb = $('logbox'), atEnd = lb.scrollTop + lb.clientHeight >= lb.scrollHeight - 30;
-  lb.innerHTML = s.logs.map(l => `<div class="${l.lv}">${l.t} [${l.lv}] [${esc(l.tag)}] ${esc(l.msg)}</div>`).join('');
-  if (atEnd) lb.scrollTop = lb.scrollHeight;
 
   // Hộp thoại nhận lệnh nằm ở phần nền: tải lại trang vẫn còn.
   const pend = s.pending ? JSON.stringify(s.pending) : null;
@@ -113,8 +124,8 @@ $('btnStop').onclick = () => guardBusy(() => api('/api/stop', {}));
 $('btnReset').onclick = () => guardBusy(async () => {
   if (await confirmBox('Bạn có chắc muốn đặt lại toàn bộ bộ đếm không?', 'Xác nhận', 'Yes', 'No')) { await api('/api/counter/reset', {}); alertBox('Đã đặt lại bộ đếm!'); }
 });
+// Không hỏi xác nhận: nút chỉ sáng khi có pallet đủ thùng chờ định danh, phần nền kiểm tra lại.
 $('btnIdentify').onclick = () => guardBusy(async () => {
-  if (!(await confirmBox('Gửi định danh pallet về server?', 'ĐỊNH DANH', 'Yes', 'No'))) return;
   const r = await api('/api/identify', {});
   if (!r.ok) alertBox(r.error, 'GỬI PALLET LỖI!');
 });
@@ -129,11 +140,12 @@ async function openTab(name) {
     pass = p;
     if (!(await api('/api/login', {})).ok) { pass = ''; return alertBox('Sai mật khẩu', 'LỖI'); }
     await loadSettings();
+    loadMfg(); loadInfo();
   }
   tab = name;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('hidden', t.id !== 'tab-' + name));
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-  if (name === 'info') loadInfo();
+  if (name === 'info') openOrders();
   if (name === 'logs') loadLogFiles();
 }
 
@@ -287,7 +299,7 @@ async function quitApp() {
   if (await confirmBox('Thoát hẳn phần mềm (đóng thiết bị, tắt cơ sở dữ liệu)?', 'Thoát', 'Yes', 'No')) await act('/api/quit', {}, 'Phần mềm đang thoát. Chạy lại chay_dinh_danh.bat để mở.');
 }
 
-// ---------- thông số ----------
+// ---------- thông tin trạm (thẻ Cài đặt) ----------
 const kv = (id, rows) => $(id).innerHTML = rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
 async function loadInfo() {
   const r = await api('/api/info'), s = r.settings;
@@ -299,11 +311,6 @@ async function loadInfo() {
     ['Lần gửi gần nhất', r.rcs === null ? 'chưa gửi' : r.rcs ? 'thành công' : 'LỖI: ' + r.rcs_error], ['Thư mục log', r.log_dir]]);
   kv('i-db', [['Database', r.db_name], ['Pallet đang làm / chờ', r.db.pallets], ['Thùng đang làm / chờ', r.db.parcels], ['Lịch sử pallet', r.db.pallets_his],
     ['Lịch sử thùng', r.db.parcels_his], ['Sự kiện', r.db.event_log], ['Dung lượng', (r.db.size_mb || 0) + ' MB']]);
-  $('i-queue').innerHTML = '<tr><th>Pallet</th><th>Mã lệnh</th><th>Task</th><th>Vị trí</th><th>Số thùng</th><th>Trạng thái</th><th></th></tr>' +
-    (r.queue.map(q => `<tr><td>${esc(q.pallet_id)}</td><td>${esc(q.po)}</td><td>${esc(q.task_id)}</td><td>${esc(q.location)}</td><td>${q.cartons}</td><td>${q.status}</td>
-      <td><button class="b danger" data-cancel="${esc(q.pallet_id)}">Hủy</button></td></tr>`).join('') || '<tr><td colspan="7">Không có lệnh</td></tr>');
-  if (!$('h-from').value) { const d = new Date(), t = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); $('h-from').value = t; $('h-to').value = t; }
-  loadHistory();
 }
 async function needPass() {
   if (pass && (await api('/api/login', {})).ok) return true;
@@ -313,23 +320,165 @@ async function needPass() {
   if ((await api('/api/login', {})).ok) return true;
   pass = ''; await alertBox('Sai mật khẩu', 'LỖI'); return false;
 }
-document.addEventListener('click', async e => {
-  const t = e.target;
-  if (t.dataset.cancel) { if (await needPass() && await confirmBox('Hủy pallet ' + t.dataset.cancel + '?', 'Hủy', 'Yes', 'No')) { await act('/api/cancel', { pallet_id: t.dataset.cancel }, 'Đã hủy pallet.'); loadInfo(); } }
-  if (t.dataset.reload) { if (await needPass() && await confirmBox('Nạp lại pallet ' + t.dataset.reload + ' để làm lại?', 'Reload', 'Yes', 'No')) { await act('/api/reload', { pallet_id: t.dataset.reload }, 'Đã nạp lại pallet.'); loadInfo(); } }
-  if (t.dataset.test) await testDevice(t.dataset.test, t);
-  if (t.dataset.reprint) { if (await needPass()) await reprintPallet(t.dataset.reprint); }
-  if (t.dataset.parcels) {
-    const r = await api('/api/history/parcels?pallet=' + encodeURIComponent(t.dataset.parcels));
-    $('i-his-parcels').innerHTML = `<tr><th colspan="5">Thùng của pallet ${esc(t.dataset.parcels)}</th></tr><tr><th>STT</th><th>Mã định danh</th><th>Khối lượng (g)</th><th>Số lần in</th><th>Thời gian</th></tr>` +
-      r.rows.map(x => `<tr><td>${x.stt}</td><td>${esc(x.code)}</td><td>${x.weight == null ? '' : x.weight}</td><td>${x.prints}</td><td>${x.done_at}</td></tr>`).join('');
+document.addEventListener('click', async e => { if (e.target.dataset.test) await testDevice(e.target.dataset.test, e.target); });
+
+// ---------- ngày sản xuất (Cài đặt vận hành) ----------
+const toIso = d => /^\d{2}\/\d{2}\/\d{4}$/.test(d || '') ? d.split('/').reverse().join('-') : '';
+const fromIso = d => d ? d.split('-').reverse().join('/') : '';
+let mfgLocked = true;
+function mfgUi() { $('mf-date').disabled = mfgLocked || !$('mf-on').checked; }
+$('mf-on').onchange = mfgUi;
+function showMfg(m) {
+  mfgLocked = !m.has_order || m.locked;
+  $('mf-po').textContent = m.has_order ? m.po : 'Chưa có lệnh';
+  $('mf-order').textContent = m.has_order ? (m.order_date || '(lệnh không gửi ngày)') : '-';
+  $('mf-eff').textContent = m.has_order ? (m.effective || '-') + (m.manual ? '  (sửa tay)' : '  (theo lệnh)') : '-';
+  $('mf-on').checked = !!m.manual; $('mf-on').disabled = mfgLocked; $('mf-save').disabled = mfgLocked;
+  $('mf-date').value = toIso(m.manual ? m.date : m.order_date) || new Date().toISOString().slice(0, 10);
+  const h = $('mf-hint');
+  h.textContent = !m.has_order ? 'Chưa có lệnh sản xuất trên bàn: ngày sản xuất chỉ sửa được cho lệnh đã về bàn.'
+    : m.locked ? 'Lệnh này đã định danh thùng / pallet: không sửa được ngày sản xuất nữa.'
+    : 'Tích “Sửa ngày sản xuất” rồi chọn ngày để in lên tem. Bỏ tích = in theo lệnh. Lệnh mới về bàn luôn lấy ngày theo lệnh.';
+  h.classList.toggle('bad', !!(m.has_order && m.locked));
+  mfgUi();
+}
+async function loadMfg() { const r = await api('/api/mfg'); if (r.ok) showMfg(r.mfg); }
+async function saveMfg() {
+  const on = $('mf-on').checked, d = fromIso(val('mf-date'));
+  if (on && !d) return alertBox('Chọn ngày sản xuất.', 'LỖI');
+  if (!(await confirmBox(on ? `In ngày sản xuất ${d} cho lệnh ${$('mf-po').textContent}?` : 'In ngày sản xuất theo lệnh?', 'Ngày sản xuất', 'Yes', 'No'))) return;
+  const r = await api('/api/mfg', { enabled: on, date: d });
+  if (!r.ok) { await alertBox(r.error, 'LỖI'); return loadMfg(); }
+  showMfg(r.mfg);
+  alertBox('Đã lưu. Tem in ra ngày ' + r.mfg.effective + '.');
+}
+
+// ---------- thẻ Thông số: bố cục và nút như phần mềm cũ ----------
+const PEND_COLS = [['inner_pallet', 'Inner_Pallet'], ['pallet_id', 'Pallet_ID'], ['item_code', 'Item_Code'], ['item_name', 'Item_Name'], ['po', 'PO_Name'],
+  ['location', 'Location'], ['status', 'Status'], ['cartons', 'Thùng đạt'], ['mfg_date', 'MFG_Date'], ['wh_code', 'WH_Code'], ['line_id', 'Line_ID'], ['po_id', 'PO_ID'], ['created_at', 'CreatedAt']];
+const DONE_COLS = PEND_COLS.concat([['done_at', 'DoneAt'], ['done_reason', 'DoneReason'], ['ctn', 'Ctn'], ['qty', 'Qty'], ['pcs', 'Pcs']]);
+const PARCEL_COLS = [['stt', 'STT'], ['code', 'Mã định danh'], ['text', 'Trạng thái'], ['mfg_date', 'Mfg_Date'], ['weight', 'Khối lượng (g)'], ['prints', 'Số lần in'], ['done_at', 'Thời gian']];
+let ord = { pending: [], completed: [] }, selPend = '', selDone = null, lastSel = '', parcelsOf = null, ordTimer = null;
+const selCodes = new Set();
+function grid(id, cols, rows, isSel, empty) {
+  $(id).innerHTML = `<tr>${cols.map(c => `<th>${esc(c[1])}</th>`).join('')}</tr>` + (rows.map((r, i) =>
+    `<tr data-i="${i}" class="${isSel(r) ? 'sel' : ''}">${cols.map(c => `<td title="${esc(r[c[0]])}">${esc(r[c[0]])}</td>`).join('')}</tr>`).join('')
+    || `<tr><td class="empty" colspan="${cols.length}">${empty}</td></tr>`);
+}
+function drawOrders() {
+  grid('g-pending', PEND_COLS, ord.pending, r => r.pallet_id === selPend, 'Không có lệnh');
+  grid('g-completed', DONE_COLS, ord.completed, r => !!selDone && r.key === selDone.key && r.pallet_id === selDone.pallet_id, 'Không có dữ liệu');
+}
+function openOrders() {
+  if (!$('h-from').value) { const d = new Date(), t = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); $('h-from').value = t; $('h-to').value = t; }
+  loadOrders();
+  clearInterval(ordTimer);
+  ordTimer = setInterval(() => { if (tab === 'info' && $('modal').classList.contains('hidden')) loadOrders(); }, 5000);
+}
+async function loadOrders() {
+  const r = await api(`/api/orders?from=${val('h-from')}&to=${val('h-to')}&pallet=${encodeURIComponent(val('h-pallet'))}&po=${encodeURIComponent(val('h-po'))}`);
+  if (!r.ok) return;
+  ord = r;
+  if (selPend && !ord.pending.some(x => x.pallet_id === selPend)) selPend = '';
+  $('st-active').textContent = r.stats.active; $('st-passed').textContent = r.stats.passed; $('st-cartons').textContent = r.stats.cartons;
+  drawOrders();
+  if (parcelsOf) loadParcels(true);
+}
+$('g-pending').onclick = e => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; selPend = ord.pending[tr.dataset.i].pallet_id; lastSel = 'pending'; drawOrders(); };
+$('g-completed').onclick = e => {
+  const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+  const r = ord.completed[tr.dataset.i];
+  selDone = { pallet_id: r.pallet_id, key: r.key, inner: r.inner_pallet }; lastSel = 'completed'; drawOrders();
+};
+$('g-pending').ondblclick = $('g-completed').ondblclick = () => loadParcels();
+['h-pallet', 'h-po'].forEach(id => $(id).onkeydown = e => { if (e.key === 'Enter') loadOrders(); });
+const curPend = () => selPend || (ord.pending[0] || {}).pallet_id || '';   // không chọn = pallet đang làm
+async function opDone(r, okText, failText) {
+  await alertBox(r.ok ? okText : (failText ? failText + '\n' : '') + r.error, r.ok ? 'THÔNG BÁO' : (r.title || 'LỖI'));
+  loadOrders();
+}
+async function pdfCurrent() {
+  const pid = curPend();
+  if (!pid) return alertBox('Chưa có mã pallet hiện tại.');
+  if (!(await confirmBox(`Bạn có chắc muốn in toàn bộ mã pallet ${pid} không?\nTrang tem mở ở thẻ mới: chọn máy in, hoặc "Lưu dưới dạng PDF" để lưu file.`, 'In PDF mã hiện tại', 'Yes', 'No'))) return;
+  window.open('/labels?pallet=' + encodeURIComponent(pid), '_blank');
+}
+async function fakeComplete() {
+  const pid = curPend();
+  if (!pid) return alertBox('Chưa có lệnh sản xuất đang chạy.');
+  if (!(await needPass()) || !(await confirmBox(`Bạn có chắc muốn gửi thành công pallet ${pid} (ảo)?\nPallet được tính là đã định danh, KHÔNG gửi gì lên server.`, 'Thành công ảo', 'Yes', 'No'))) return;
+  opDone(await api('/api/orders/fake_complete', { pallet_id: pid }), 'Gửi thành công thông tin ảo định danh pallet!', 'Gửi không thành công thông tin ảo định danh pallet!');
+}
+async function pullNext() {
+  if (!(await confirmBox('BẠN CÓ CHẮC CHẮN TẢI LỆNH TIẾP THEO KHÔNG?', 'THÔNG BÁO', 'Yes', 'No'))) return;
+  const r = await api('/api/orders/pull_next', {});
+  opDone(r, 'Đã tải lệnh: pallet ' + r.pallet_id);
+}
+async function deleteTask() {
+  const pid = curPend();
+  if (!pid) return alertBox('Chưa có lệnh sản xuất đang chạy.');
+  if (!(await needPass()) || !(await confirmBox(`Bạn muốn xóa lệnh đang làm (pallet ${pid}) đúng không?\nPallet chuyển xuống bảng LỆNH ĐÃ HOÀN THÀNH (ĐÃ XÓA), làm lại được bằng nút Thực hiện lại.`, 'Xóa lệnh đang làm', 'Yes', 'No'))) return;
+  opDone(await api('/api/orders/delete', { pallet_id: pid }), 'Đã xóa lệnh pallet ' + pid);
+}
+async function sendIdentify() {
+  const pid = curPend();
+  if (!pid) return alertBox('Chưa có lệnh sản xuất đang chạy.');
+  opDone(await api('/api/identify', { pallet_id: pid }), 'Gửi thành công thông tin định danh pallet!', 'Gửi không thành công thông tin định danh pallet!');
+}
+async function reloadTask() {
+  if (!selDone) return alertBox('Vui lòng chọn một lệnh ở bảng LỆNH ĐÃ HOÀN THÀNH.');
+  if (!(await needPass()) || !(await confirmBox(`Bạn có chắc chắn muốn reload lệnh sản xuất này không?\n\nPallet_ID: ${selDone.pallet_id}\nInner_Pallet: ${selDone.inner}`, 'Thực hiện lại', 'Yes', 'No'))) return;
+  opDone(await api('/api/reload', { pallet_id: selDone.pallet_id }), 'Reload pallet từ lịch sử thành công.');
+}
+async function loadParcels(quiet) {
+  if (!quiet) {
+    if (lastSel === 'pending' && selPend) parcelsOf = { pallet_id: selPend, key: '' };
+    else if (lastSel === 'completed' && selDone) parcelsOf = { pallet_id: selDone.pallet_id, key: selDone.key };
+    else return alertBox('Vui lòng chọn một lệnh (pallet) trước khi tải mã định danh.');
+    selCodes.clear();
   }
-});
-async function loadHistory() {
-  const r = await api(`/api/history?from=${val('h-from')}&to=${val('h-to')}&q=${encodeURIComponent(val('h-q'))}`);
-  $('i-his').innerHTML = '<tr><th>Thời gian</th><th>Pallet</th><th>Mã lệnh</th><th>Sản phẩm</th><th>Vị trí</th><th>Thùng đạt</th><th>Kết quả</th><th></th></tr>' +
-    (r.rows.map(h => `<tr><td>${h.done_at}</td><td>${esc(h.pallet_id)}</td><td>${esc(h.po)}</td><td>${esc(h.item)}</td><td>${esc(h.location)}</td><td>${h.cartons}</td><td>${h.status} / ${esc(h.reason)}</td>
-      <td><button class="b" data-parcels="${esc(h.pallet_id)}">Xem thùng</button> <button class="b" data-reprint="${esc(h.pallet_id)}">In lại tem</button> <button class="b warn" data-reload="${esc(h.pallet_id)}">Nạp lại</button></td></tr>`).join('') || '<tr><td colspan="8">Không có dữ liệu</td></tr>');
+  const r = await api(`/api/orders/parcels?pallet=${encodeURIComponent(parcelsOf.pallet_id)}&key=${parcelsOf.key}`);
+  if (!r.ok) {
+    if (quiet) return;                     // pallet vừa chuyển sang lịch sử: giữ bảng cũ
+    parcelsOf = null;
+    return alertBox(r.error);
+  }
+  parcelsOf.item = r.item; parcelsOf.rows = r.rows;
+  $('ps-total').textContent = `Tổng số thùng trong pallet: ${r.done} / ${r.total}`;
+  $('ps-pallet').textContent = '— ' + r.pallet_id;
+  const all = r.rows.length > 0 && r.rows.every(x => selCodes.has(x.code));
+  $('g-parcels').innerHTML = `<tr><th><input type="checkbox" id="ps-all" ${all ? 'checked' : ''} title="Chọn tất cả"></th>${PARCEL_COLS.map(c => `<th>${c[1]}</th>`).join('')}</tr>` +
+    (r.rows.map((x, i) => `<tr data-i="${i}" class="${selCodes.has(x.code) ? 'sel' : ''}"><td><input type="checkbox" ${selCodes.has(x.code) ? 'checked' : ''}></td>${PARCEL_COLS.map(c => `<td>${esc(x[c[0]])}</td>`).join('')}</tr>`).join('')
+      || `<tr><td class="empty" colspan="8">Không có thùng</td></tr>`);
+}
+$('g-parcels').onclick = e => {
+  if (!parcelsOf || !parcelsOf.rows) return;
+  if (e.target.id === 'ps-all') { if (e.target.checked) parcelsOf.rows.forEach(x => selCodes.add(x.code)); else selCodes.clear(); }
+  else {
+    const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+    const c = parcelsOf.rows[tr.dataset.i].code;
+    if (selCodes.has(c)) selCodes.delete(c); else selCodes.add(c);
+  }
+  loadParcels(true);
+};
+async function reprintCodes() {
+  if (!parcelsOf || !selCodes.size) return alertBox('Vui lòng chọn một thùng (parcel) để in lại.');
+  const codes = [...selCodes];
+  if (!(await needPass()) || !(await confirmBox(codes.length === 1 ? `In lại tem thùng ${codes[0]}?` : `In lại ${codes.length} tem của pallet ${parcelsOf.pallet_id}?`, 'In lại mã định danh', 'Yes', 'No'))) return;
+  const r = await api('/api/reprint_pallet', { pallet_id: parcelsOf.pallet_id, codes });
+  if (!r.ok) return alertBox('In lại tem thất bại: ' + r.error, 'LỖI');
+  // In chạy nền (bấm Dừng để hủy); chờ xong rồi báo kết quả như bản cũ.
+  let j = null;
+  for (let t = 0; t < 1200; t++) {
+    await new Promise(ok => setTimeout(ok, 500));
+    j = state && state.job;
+    if (j && j.id === r.job && !j.active) break;
+  }
+  if (!j || j.active) return;
+  if (j.error) alertBox(`In lại tem thất bại: ${j.error} (${j.done}/${j.total})`, 'LỖI');
+  else if (j.cancelled) alertBox(`Đã hủy in lại (${j.done}/${j.total}).`);
+  else alertBox(r.total === 1 ? `In lại tem thành công: ${codes[0]} với mã hàng: ${parcelsOf.item}` : `In lại tem thành công: ${j.done} tem của pallet ${r.pallet_id}.`);
+  loadParcels(true);
 }
 
 // ---------- log ----------

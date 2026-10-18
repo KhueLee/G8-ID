@@ -1,6 +1,6 @@
 # G8 ID – Docking protocol (giao tiếp trạm định danh ↔ WMS / WCS / RCS)
 
-Phiên bản phần mềm trạm: **2.1.0**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
+Phiên bản phần mềm trạm: **2.2.0**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
 (`G8-ID-Deploy/app/webui.py`, `app/engine.py`). Mục 8 liệt kê các điểm cần đối tác xác nhận.
 
 ## 1. Tổng quan
@@ -103,7 +103,7 @@ sau.
 | `Location` | chuỗi | | Vị trí sàn của pallet, hiện trên màn hình |
 | `Item_Code` / `Item_Name` | chuỗi | | Tên sản phẩm trên màn hình và tem (ưu tiên `Item_Name`) |
 | `Weight_ref` | số (gam) | | > 0 thì dùng làm khối lượng chuẩn khi cân; không có thì dùng cài đặt của trạm |
-| `MFG_Date` | chuỗi | | Ngày sản xuất |
+| `MFG_Date` | chuỗi | | Ngày sản xuất, in dòng NSX trên tem thùng (`dd/mm/yyyy`; nhận cả `yyyy-mm-dd`). Trạm được sửa tay NSX của lệnh chưa định danh thùng nào |
 | `Ctn`, `Qty`, `Pcs`, `Inner_Carton`, `Inner_Pallet`, `Pallet_Current` | số | | Lưu; số thùng thực tế lấy theo độ dài `Carton_List` |
 
 **Tách mã thùng:** mỗi chuỗi trong `Carton_List` được cắt khoảng trắng rồi tách theo `|`. Có từ

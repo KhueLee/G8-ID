@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.1.0)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.2.0)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -93,7 +93,7 @@ git stash pop
 | `chay_mo_phong.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL** / **HYBRID**. |
 | `HUONG_DAN_VAN_HANH.pdf` | Hướng dẫn kỹ thuật vận hành: biểu tượng *Chạy phần mềm* (`chay_dinh_danh.bat`) và *Chạy mô phỏng* (`chay_mo_phong.bat`). Nguồn: `docs\huong_dan_van_hanh.py`. |
 | `check_env.bat` | Kiểm tra máy (Python, thư viện, COM, máy in, MX Component, firewall) → `logs\check_env.txt`. |
-| `run_tests.bat` | 20 bài kiểm tra tự động (~2 phút), chạy được ngay trên máy trạm. |
+| `run_tests.bat` | 26 bài kiểm tra tự động (~3 phút), chạy được ngay trên máy trạm. |
 | `cai_dat_may_moi.bat` | Cài đặt máy trạm mới (mục 1, bước 4). |
 | `install.bat` | Cài thư viện Python. |
 | `tools\scanner_timeout.bat` | Gửi lệnh cấu hình xuống đầu đọc (mục 4). |
@@ -192,7 +192,7 @@ Component rồi mở lại `chay_dinh_danh.bat`.
   `pallets_his`, `parcels_his`.
 - Lịch sử tự xoá sau 90 ngày, `event_log` sau 30 ngày (TTL), trần 300.000 bản ghi mỗi bảng
   (`config.json` → `mongo`). Giảm `history_days` thì lịch sử cũ hơn bị xoá luôn.
-- Cache mongod giới hạn 0,25 GB. Thẻ **Thông số** hiện số bản ghi và dung lượng.
+- Cache mongod giới hạn 0,25 GB. Thẻ **Cài đặt** → *Thông tin trạm* hiện số bản ghi và dung lượng.
 
 ## 7. Giao tiếp với hệ thống khác
 
@@ -216,9 +216,20 @@ Component rồi mở lại `chay_dinh_danh.bat`.
    xác nhận.
 4. `tools\scanner_timeout.bat`: mới thử với cổng COM giả.
 5. Máy in Godex: đã nạp `EZio64.dll` và kết nối; nên dùng *In thử tem* ở thẻ Cài đặt lần đầu.
-6. Chưa làm: xuất PDF danh sách tem.
+6. *In PDF mã hiện tại* (thẻ Thông số) mở trang tem 70x40 mm trong Chrome để in / *Lưu dưới dạng PDF*;
+   chưa thử in trang này ra máy Godex qua driver Windows.
 
-## 9. Cấu trúc thư mục
+## 9. Phiên bản
+
+Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.2.0 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+
+| Bản | Thay đổi |
+|---|---|
+| 2.2.0 | Trang chủ: bỏ ô log, cột thông tin rộng hơn 1,8 lần, chữ to gấp đôi; dải thông báo dưới cùng cao gấp đôi, chữ dài tự xuống 2 dòng. Cài đặt: thêm *Cài đặt vận hành* – sửa tay ngày sản xuất (NSX) của lệnh chưa định danh; thông tin trạm chuyển từ thẻ Thông số sang. Thông số: bố cục và nút như phần mềm cũ (In PDF mã hiện tại, Thành công ảo, Tải lệnh mới, Xóa lệnh đang làm, Gửi định danh, Thực hiện lại, Tải mã định danh, In lại mã định danh). Bấm Định danh / Gửi định danh: gửi ngay, không hỏi xác nhận. Tem: bỏ khối lượng, thêm NSX; giờ in lên trên mã QR, mã định danh xuống dải dưới cùng, bỏ chữ "Ten SP" / "Ma SP", tên SP in 2 dòng. Thư viện mới `segno` (mã QR trang PDF) – `update.bat` tự chạy `install.bat`. |
+| 2.1.0 | Bản thay thế `VTP_Induction.exe`: Python + MongoDB, giao diện Chrome, mô phỏng, HYBRID, tự dò cổng COM. |
+
+## 10. Cấu trúc thư mục
 
 ```
 G8-ID-Deploy\

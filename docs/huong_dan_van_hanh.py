@@ -4,6 +4,7 @@
 Chạy: python docs/huong_dan_van_hanh.py   (cần reportlab; font Arial của Windows)
 """
 import os
+import re
 import time
 
 from reportlab.lib import colors
@@ -18,6 +19,8 @@ from reportlab.platypus import (CondPageBreak, KeepTogether, ListFlowable, ListI
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "G8-ID-Deploy", "HUONG_DAN_VAN_HANH.pdf")
+with open(os.path.join(ROOT, "G8-ID-Deploy", "app", "config.py"), encoding="utf-8") as _f:
+    VERSION = re.search(r'^VERSION = "([^"]+)"', _f.read(), re.M).group(1)
 FONTS = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")
 
 pdfmetrics.registerFont(TTFont("Arial", os.path.join(FONTS, "arial.ttf")))
@@ -141,7 +144,7 @@ def build():
     s += [P("HƯỚNG DẪN VẬN HÀNH TRẠM ĐỊNH DANH G8 ID", title), Spacer(1, 4),
           P("Dành cho kỹ thuật vận hành. Chỉ cần dùng 2 biểu tượng trên màn hình chính "
             "(Desktop) của máy trạm.", subtitle),
-          P("Phiên bản phần mềm 2.1.0 · cập nhật %s" % time.strftime("%d/%m/%Y"), small),
+          P("Phiên bản phần mềm %s · cập nhật %s" % (VERSION, time.strftime("%d/%m/%Y")), small),
           Spacer(1, 10)]
     s += table([
         ["Biểu tượng trên Desktop", "Mở file", "Dùng khi nào"],
@@ -160,7 +163,7 @@ def build():
               "3. Muốn về AUTO phải <b>đóng hẳn</b> cửa sổ đen của \u201cChạy mô phỏng\u201d trước."])
     s += [P("Mục lục", h2)]
     s += bullets(["<b>Phần A – Chạy phần mềm</b>: mở, đọc màn hình, quy trình sản xuất, xử lý "
-                  "thông báo, đổi chế độ, tắt phần mềm, cập nhật phần mềm.",
+                  "thông báo, đổi chế độ, ngày sản xuất, tắt phần mềm, cập nhật phần mềm, thẻ Thông số.",
                   "<b>Phần B – Chạy mô phỏng</b>: chuẩn bị, các ô trên công cụ, chạy thử MANUAL, "
                   "chạy thử HYBRID, trở về sản xuất.",
                   "<b>Phần C – Khi cần hỗ trợ</b>: gửi gì cho kỹ thuật phần mềm."])
@@ -195,21 +198,22 @@ def build():
         ["RCS", "Lần gửi kết quả pallet gần nhất lên server: xanh = gửi được, đỏ = lỗi "
                 "(máy tự gửi lại mỗi 30 giây), cam = chưa gửi lần nào."],
     ], [26, 148])
-    s += [CondPageBreak(60 * mm), P("<b>Phần thân màn hình</b> chia 3 cột:")]
+    s += [CondPageBreak(60 * mm), P("<b>Phần thân màn hình</b> chia 3 cột và một dải dưới cùng:")]
     s += table([
         ["Vùng", "Nội dung"],
-        ["Cột trái", "Thùng hiện tại (đã làm / tổng), mã lệnh, mã pallet, vị trí, tên sản phẩm, "
-                     "quy cách, cân nặng, số pallet và số thùng hoàn thành, ngày in trên tem."],
-        ["Cột giữa", "Danh sách mã thùng của pallet đang làm (dòng xanh = thùng đang xử lý). "
-                     "Bên dưới là <b>dòng thông báo</b> (có mũi tên) – luôn đọc dòng này để biết "
-                     "máy đang chờ gì."],
+        ["Cột trái (chữ to)", "Thùng hiện tại (đã làm / tổng), mã lệnh, mã pallet, vị trí, tên sản phẩm, "
+                     "quy cách, cân nặng, số pallet và số thùng hoàn thành, ngày in trên tem (NSX). "
+                     "Chữ dài tự xuống 2 dòng."],
+        ["Cột giữa", "Danh sách mã thùng của pallet đang làm (dòng xanh = thùng đang xử lý)."],
         ["Cột phải", "Khối lượng cân; ô trạng thái lớn <b>STOP / RUN / OK / NG</b>; bộ đếm "
-                     "<b>Đạt</b> / <b>Sai</b> (nút <i>Đặt lại bộ đếm</i> để về 0); nút "
-                     "<b>Bắt đầu</b> và <b>Dừng</b>."],
+                     "<b>Đạt</b> / <b>Sai</b> (nút <i>Đặt lại bộ đếm</i> để về 0)."],
+        ["Dải dưới cùng", "VỊ TRÍ 01–03 (ô nhấp nháy = nơi đặt pallet); <b>dòng thông báo</b> chữ "
+                          "lớn (có mũi tên) – luôn đọc dòng này để biết máy đang chờ gì; nút "
+                          "<b>Bắt đầu</b> và <b>Dừng</b>."],
         ["Các thẻ", "<b>Trang chủ</b> · <b>Cài đặt</b> (cần mật khẩu, mặc định 1234) · "
-                    "<b>Thông số</b> (trạng thái, lịch sử pallet, in lại tem) · "
-                    "<b>Lịch sử Log</b> · <b>Hướng dẫn</b> (mở tài liệu này)."],
-    ], [26, 148])
+                    "<b>Thông số</b> (danh sách lệnh, in lại tem – mục A11) · "
+                    "<b>Lịch sử Log</b> (nhật ký chạy) · <b>Hướng dẫn</b> (mở tài liệu này)."],
+    ], [30, 144])
 
     s += [CondPageBreak(80 * mm), P("A3. Quy trình sản xuất một lệnh (chế độ AUTO)", h2)]
     s += steps([
@@ -218,11 +222,14 @@ def build():
         "Dòng thông báo: <b>CHỜ ĐẶT SẢN PHẨM LÊN CÂN</b> → đặt thùng lên cân.",
         "Máy tự làm: <b>CÂN SẢN PHẨM...</b> → <b>ĐANG IN TEM...</b> → dán tem đúng vị trí cho "
         "đầu đọc → <b>ĐANG ĐỌC MÃ VẠCH...</b> Số to ở góc trên tem (cạnh logo) là "
-        "<b>số thứ tự của thùng trong pallet</b> (1, 2, 3 …), giống cột STT trong danh sách thùng.",
+        "<b>số thứ tự của thùng trong pallet</b> (1, 2, 3 …), giống cột STT trong danh sách thùng. "
+        "Tem gồm: giờ + ngày in (trên mã QR), tên sản phẩm (2 dòng), mã pallet, mã lệnh, "
+        "<b>NSX</b> (ngày sản xuất) và <b>mã định danh</b> ở dải dưới cùng.",
         "Thùng đạt: ô lớn <font color='#1e8a1e'><b>OK</b></font>, đèn xanh. Lấy thùng ra khỏi cân; "
         "khi thấy <b>SẴN SÀNG CHO SẢN PHẨM MỚI</b> thì đặt thùng tiếp theo.",
         "Đủ thùng của pallet: thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "
-        "<b>Định danh</b> trên thanh đầu, chọn <b>Yes</b> để gửi pallet lên server.",
+        "<b>Định danh</b> trên thanh đầu – pallet được gửi lên server ngay, không hỏi xác nhận "
+        "(nút chỉ bấm được khi pallet đã đủ thùng).",
         "Thấy <b>PALLET OK – TIẾP TỤC SẢN XUẤT</b> → làm pallet tiếp theo. Hết lệnh: "
         "<b>ĐÃ HOÀN TẤT LỆNH SẢN XUẤT</b>, trạm tự về STOP.",
     ])
@@ -318,13 +325,27 @@ def build():
          "ở đâu. Ô 4–6 chỉ để lưu (giống bản cũ)."],
     ], [42, 26, 106])
 
+    s += [CondPageBreak(70 * mm), P("Cài đặt vận hành: sửa ngày sản xuất (NSX) in trên tem", h2),
+          P("Ô <b>Cài đặt vận hành</b> nằm dưới ô Chế độ chạy. Mặc định tem in <b>NSX theo lệnh</b> "
+            "WMS gửi; mỗi lệnh mới về bàn đều lấy lại NSX theo lệnh.")]
+    s += steps([
+        "Bấm <b>■ Dừng</b>, mở thẻ <b>Cài đặt</b>.",
+        "Ô Cài đặt vận hành hiện <i>Lệnh hiện tại</i>, <i>NSX theo lệnh</i> và <i>Đang in trên tem</i>.",
+        "Tích <b>Sửa ngày sản xuất</b>, chọn ngày → <b>Lưu ngày sản xuất</b> → Yes. Dòng "
+        "<i>Ngày in trên tem</i> ở Trang chủ đổi theo.",
+        "Muốn in lại theo lệnh: bỏ tích → <b>Lưu ngày sản xuất</b>.",
+    ])
+    s += box(["Chỉ sửa được khi lệnh <b>chưa định danh thùng / pallet nào</b>. Đã có thùng đạt thì ô "
+              "bị khóa (chữ đỏ) để mọi tem trong một lệnh cùng một NSX. In lại tem dùng đúng NSX đã "
+              "in lần đầu."])
+
     s += [CondPageBreak(90 * mm), P("A9. Cài đặt thiết bị: số bàn, cổng COM, kiểm tra kết nối", h2),
           P("Thẻ <b>Cài đặt</b> → ô <b>Thiết bị</b>. Chỉ sửa được khi trạm đang <b>STOP</b>. Sửa "
             "xong bấm <b>Lưu + kết nối lại thiết bị</b>.")]
     s += table([
         ["Mục", "Cách dùng"],
         ["Số thứ tự bàn định danh", "Số của bàn này (1–999). Hiện ở góc đồng hồ trên thanh đầu "
-                                    "(vd <i>ST02 · Bàn 3 · AUTO</i>) và ở thẻ Thông số."],
+                                    "(vd <i>ST02 · Bàn 3 · AUTO</i>) và ở thẻ Cài đặt → Thông tin trạm."],
         ["Tự dò (mặc định)",
          "Mỗi lần mở phần mềm và mỗi lần lưu, máy tự tìm cổng theo tên trong Windows: "
          "<b>cân = USB Serial Port</b>, <b>đầu đọc = USB Serial Device</b>, <b>PLC = USB-SERIAL "
@@ -372,8 +393,35 @@ def build():
         "Nhấp đúp <b>Chạy phần mềm</b> để chạy bản mới.",
     ])
     s += box(["Thông số trong thẻ Cài đặt và dữ liệu sản xuất <b>không bị ảnh hưởng</b> khi cập nhật.",
+              "Kiểm tra đã lên bản mới: số phiên bản ở góc đồng hồ trên thanh đầu "
+              "(vd <i>18/10/2026 · v%s · ST02 · Bàn 1 · AUTO</i>) phải đúng số kỹ thuật báo." % VERSION,
               "Nếu báo <b>[LOI] Khong cap nhat duoc</b>: kiểm tra mạng, rồi chụp màn hình cửa sổ "
               "gửi kỹ thuật phần mềm. Không tự sửa / xóa file trong thư mục phần mềm."], SOFT, BRAND)
+
+    s += [CondPageBreak(90 * mm), P("A11. Thẻ Thông số: quản lý lệnh và in lại tem (vận hành thủ công)", h2),
+          P("Bố cục và các nút giống phần mềm cũ. Trên cùng: lọc theo ngày <b>Từ / Đến</b>, "
+            "<b>Mã pallet</b>, <b>Mã lệnh</b> → <b>Tìm kiếm</b>; bên phải là <i>Số lệnh đang thực hiện</i>, "
+            "<i>Số lệnh đã qua</i>, <i>Số thùng đã hoàn thành</i>. Bấm vào một dòng để chọn lệnh; "
+            "không chọn thì nút dùng pallet đang làm. Bảng tự cập nhật mỗi 5 giây.")]
+    s += table([
+        ["Nút", "Làm gì", "Ghi chú"],
+        ["In PDF mã hiện tại", "Mở trang tem (70x40 mm, có mã QR) của mọi thùng trong pallet "
+         "ở thẻ mới của Chrome.", "Chọn máy in, hoặc <i>Lưu dưới dạng PDF</i> để lưu file."],
+        ["Thành công ảo", "Coi pallet là đã định danh xong, chuyển xuống bảng đã hoàn thành.",
+         "<b>Không gửi</b> lên server. Cần mật khẩu, phải Dừng trước."],
+        ["Tải lệnh mới", "Đưa pallet chờ đầu tiên vào làm.",
+         "Từ chối nếu đang có pallet đang làm."],
+        ["Xóa lệnh đang làm", "Hủy pallet, chuyển xuống bảng LỆNH ĐÃ HOÀN THÀNH (ĐÃ XÓA).",
+         "Cần mật khẩu, phải Dừng trước. Làm lại bằng <b>Thực hiện lại</b>."],
+        ["Gửi định danh", "Gửi ngay pallet đang chọn lên server, không hỏi xác nhận (như nút Định danh trên thanh đầu).",
+         "Pallet chưa đủ thùng: báo <i>CHƯA ĐỦ SỐ LƯỢNG HÀNG!</i>"],
+        ["Thực hiện lại", "Nạp lại pallet đã chọn ở bảng đã hoàn thành để làm lại từ đầu.",
+         "Cần mật khẩu; chỉ khi không còn lệnh đang làm / chờ."],
+        ["Tải mã định danh", "Hiện danh sách thùng của lệnh đã chọn (bên phải) và "
+         "<i>Tổng số thùng trong pallet: đạt / tổng</i>.", "Nhấp đúp vào lệnh cũng được."],
+        ["In lại mã định danh", "In lại tem của các thùng đã tích (ô vuông đầu dòng; ô ở tiêu đề = "
+         "chọn tất cả).", "Chỉ thùng đã cân / in đạt. Cần mật khẩu. Bấm Dừng để hủy giữa chừng."],
+    ], [34, 76, 64])
 
     # ------------------------------------------------------------------ PHẦN B
     s += [PageBreak()]

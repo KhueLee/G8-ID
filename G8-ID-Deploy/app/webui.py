@@ -4,6 +4,7 @@
     - giữ nguyên đường dẫn và mã phản hồi của WcsHttpServer bản cũ.
 """
 import datetime
+import html
 import json
 import logging
 import os
@@ -73,9 +74,7 @@ def build_ui(engine, on_quit):
     # ---- vận hành (không cần mật khẩu) ----
     @app.get("/api/state")
     def state():
-        s = engine.snapshot()
-        s["logs"] = list(logsetup.recent)[-40:]
-        return jsonify(s)
+        return jsonify(engine.snapshot())
 
     @app.post("/api/start")
     def start():
@@ -87,7 +86,7 @@ def build_ui(engine, on_quit):
 
     @app.post("/api/identify")
     def identify():
-        return jsonify(engine.identify())
+        return jsonify(engine.identify(str(body().get("pallet_id", "") or "").strip()))
 
     @app.post("/api/counter/reset")
     def counter_reset():
@@ -148,6 +147,58 @@ def build_ui(engine, on_quit):
     def history_parcels():
         return jsonify(rows=engine.history_parcels(request.args.get("pallet", "")))
 
+    # ---- thẻ Thông số (bố cục và nút như bản cũ) ----
+    def day_range():
+        fmt = "%Y-%m-%d"
+        today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        out = []
+        for k in ("from", "to"):
+            try:
+                out.append(datetime.datetime.strptime(request.args.get(k, ""), fmt))
+            except ValueError:
+                out.append(today)
+        return out[0], out[1] + datetime.timedelta(days=1)
+
+    @app.get("/api/orders")
+    def orders():
+        d1, d2 = day_range()
+        return jsonify(ok=True, **engine.orders(d1, d2, request.args.get("pallet", "").strip(),
+                                                request.args.get("po", "").strip()))
+
+    @app.get("/api/orders/parcels")
+    def order_parcels():
+        try:
+            return jsonify(ok=True, **engine.order_parcels(request.args.get("pallet", ""),
+                                                           request.args.get("key", "")))
+        except OrderError as e:
+            return jsonify(ok=False, error=str(e))
+
+    @app.post("/api/orders/pull_next")
+    def pull_next():
+        try:
+            return jsonify(ok=True, pallet_id=engine.pull_next())
+        except OrderError as e:
+            return jsonify(ok=False, error=str(e))
+
+    @app.post("/api/orders/fake_complete")
+    @guard
+    def fake_complete():
+        return {"pallet_id": engine.fake_complete(body().get("pallet_id", ""))}
+
+    @app.post("/api/orders/delete")
+    @guard
+    def delete_order():
+        return {"cancelled": engine.delete_pallet(body().get("pallet_id", ""))}
+
+    @app.get("/labels")
+    def labels():
+        """"In PDF mã hiện tại": trang tem 70x40 mm của pallet đang làm -> Chrome in / lưu PDF."""
+        try:
+            data = engine.label_sheet(request.args.get("pallet", ""))
+        except OrderError as e:
+            return "<meta charset=utf-8><h2>%s</h2>" % html.escape(str(e)), 404
+        return label_page(data)
+
     # ---- công cụ mô phỏng ----
     @app.get("/api/mode")
     def mode():
@@ -177,6 +228,17 @@ def build_ui(engine, on_quit):
     @guard
     def post_settings():
         engine.save_settings(body())
+
+    @app.get("/api/mfg")
+    @guard
+    def get_mfg():
+        return {"mfg": engine.mfg_info()}
+
+    @app.post("/api/mfg")
+    @guard
+    def post_mfg():
+        b = body()
+        return {"mfg": engine.set_mfg(b.get("enabled"), b.get("date", ""))}
 
     @app.post("/api/mode")
     @guard
@@ -232,7 +294,9 @@ def build_ui(engine, on_quit):
     @app.post("/api/reprint_pallet")
     @guard
     def reprint_pallet():
-        return engine.reprint_pallet(body().get("pallet_id", ""))
+        b = body()
+        codes = b.get("codes") if isinstance(b.get("codes"), list) else None
+        return engine.reprint_pallet(b.get("pallet_id", ""), codes)
 
     @app.post("/api/reload")
     @guard
@@ -268,6 +332,54 @@ def build_ui(engine, on_quit):
 def _ports():
     from .devices import portmap
     return portmap.list_ports()
+
+
+LABEL_CSS = """
+@page { size: 70mm 40mm; margin: 0; }
+* { box-sizing: border-box; margin: 0; }
+body { font-family: Arial, sans-serif; background: #ccc; }
+.bar { padding: 8px; font: 14px Arial; background: #333; color: #fff; }
+.bar button { font-size: 14px; padding: 6px 14px; margin-right: 8px; }
+.tem { width: 70mm; height: 40mm; background: #fff; margin: 6px auto; padding: 1.2mm;
+       display: grid; grid-template-columns: 36mm 1fr; grid-template-rows: 1fr 5mm;
+       overflow: hidden; page-break-after: always; break-after: page; }
+.l { font-size: 2.6mm; font-weight: 600; line-height: 1.25; overflow: hidden; }
+.top { display: flex; align-items: center; gap: 2mm; height: 9mm; }
+.logo { font-weight: 900; font-size: 4mm; color: #000; }
+.seq { font-size: 8mm; font-weight: 900; }
+.name { font-size: 2.2mm; line-height: 1.2; height: 5.4mm; overflow: hidden; margin: .6mm 0 .4mm; }
+.r { text-align: center; }
+.stamp { font-size: 2.3mm; font-weight: 600; }
+.r svg { width: 28mm; height: 28mm; }
+.code { grid-column: 1 / 3; font-size: 3.4mm; font-weight: 900; align-self: center; }
+@media print { body { background: #fff; } .bar { display: none; } .tem { margin: 0; } }
+"""
+
+
+def label_page(data):
+    """Trang in tem của cả pallet, bố cục giống tem Godex (khu 1 giờ in, khu 2 mã định danh)."""
+    try:
+        import segno
+    except ImportError:
+        segno = None
+    stamp = datetime.datetime.now().strftime("%Hh%Mp%Ss %d/%m/%Y")
+    e = html.escape
+    out = []
+    for r in data["rows"]:
+        qr = segno.make(r["code"], error="l", micro=False).svg_inline(scale=1, border=0, omitsize=True) \
+            if segno else "<b>(thiếu thư viện segno - chạy install.bat)</b>"
+        out.append(
+            '<div class="tem"><div class="l"><div class="top"><span class="logo">G8HOME</span>'
+            '<span class="seq">%s</span></div><div class="name">%s</div>'
+            '<div>Ma Pallet : %s</div><div>Ma Lenh&nbsp;&nbsp; : %s</div><div>NSX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : %s</div></div>'
+            '<div class="r"><div class="stamp">%s</div>%s</div><div class="code">%s</div></div>'
+            % (r["seq"], e(data["item"]), e(data["pallet_id"]), e(data["wh_code"]),
+               e(r["mfg_date"]), stamp, qr, e(r["code"])))
+    return ('<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Tem pallet %s</title>'
+            '<style>%s</style></head><body><div class="bar">Pallet <b>%s</b> - %d tem. '
+            '<button onclick="print()">In / Lưu PDF</button> Chọn máy in "Save as PDF" (Lưu dưới '
+            'dạng PDF) để lưu file.</div>%s<script>setTimeout(print, 400)</script></body></html>'
+            % (e(data["pallet_id"]), LABEL_CSS, e(data["pallet_id"]), len(out), "".join(out)))
 
 
 def build_order_server(engine):

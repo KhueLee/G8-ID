@@ -1,7 +1,10 @@
 """Máy in tem Godex qua thư viện EZio (EZio64.dll / EZio32.dll) - đúng driver của bản cũ.
 
-Bố cục tem thùng 70x40 mm và tem pallet giữ nguyên toạ độ, cỡ chữ, tham số QR của
-CPrinterGodex.cs. Mọi lệnh gọi DLL đi qua một khoá để không gọi chồng nhau.
+Tem thùng 70x40 mm (560x320 điểm, 8 điểm/mm), bố cục từ bản 2.2.0:
+  khu 1 (trên mã QR): giờ + ngày in tem
+  cột trái: logo, số thứ tự thùng, tên sản phẩm (tối đa 2 dòng), mã pallet, mã lệnh, NSX
+  khu 2 (dải dưới cùng): mã định danh
+Mọi lệnh gọi DLL đi qua một khoá để không gọi chồng nhau.
 """
 import ctypes
 import datetime
@@ -18,6 +21,42 @@ LABEL_W_MM, LABEL_H_MM, GAP_MM = 70, 40, 3
 SPEED_IPS, DARKNESS = 4, 10
 FW_EXTRALIGHT, FW_SEMIBOLD, FW_HEAVY = 200, 600, 900
 SEQ_X, SEQ_Y, SEQ_H = 125, 18, 64      # số thứ tự thùng: chữ to, cạnh logo, trái mã QR
+QR_X, QR_Y, QR_MUL = 300, 36, 9        # mã QR (bản 25 ô = 225 điểm) chừa chỗ khu 1 và khu 2
+STAMP_X, STAMP_Y, STAMP_H = 300, 8, 20  # khu 1: giờ + ngày in
+LEFT_X, LEFT_W = 10, 282               # cột chữ bên trái mã QR
+NAME_Y, NAME_GAP = 88, 28              # tên sản phẩm: 2 dòng
+NAME_SIZES = (24, 22, 20, 18)          # cỡ chữ tên SP: lấy cỡ lớn nhất còn vừa 2 dòng
+LINE_Y, LINE_GAP, LINE_H = 150, 36, 22  # mã pallet / mã lệnh / NSX
+CODE_Y, CODE_H = 286, 28               # khu 2: mã định danh, cả chiều ngang tem
+CHAR_W = 0.55                          # bề rộng trung bình 1 ký tự Arial ~ 0,55 x cỡ chữ
+
+
+def wrap2(text, width=LEFT_W, sizes=NAME_SIZES):
+    """Chia tên sản phẩm thành tối đa 2 dòng vừa `width` điểm; trả (cỡ chữ, [dòng])."""
+    words = str(text or "").split()
+    for h in sizes:
+        cap = max(1, int(width / (h * CHAR_W)))
+        lines, cur = [], ""
+        for w in words:
+            while len(w) > cap:                      # từ quá dài (mã liền): cắt cứng
+                if cur:
+                    lines.append(cur)
+                    cur = ""
+                lines.append(w[:cap])
+                w = w[cap:]
+            if not cur:
+                cur = w
+            elif len(cur) + 1 + len(w) <= cap:
+                cur += " " + w
+            else:
+                lines.append(cur)
+                cur = w
+        if cur:
+            lines.append(cur)
+        if len(lines) <= 2:
+            return h, lines
+    rest = " ".join(lines[1:])
+    return sizes[-1], [lines[0], rest[:cap - 1] + "…" if len(rest) > cap else rest]
 
 
 class GodexPrinter:
@@ -151,8 +190,7 @@ class GodexPrinter:
         data = text.encode("utf-16-le")
         dll.ecTextOutRW(x, y, h, b"Arial", data, 0, weight, 0, len(text))
 
-    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, weight_g, mfg_date="",
-                     seq=None):
+    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, mfg_date="", seq=None):
         with self._lock:
             if not self._open:
                 return False
@@ -165,15 +203,18 @@ class GodexPrinter:
                     dll.putimage(10, 20, logo.encode("mbcs"), 0)
                 if seq:
                     self._text(dll, SEQ_X, SEQ_Y, SEQ_H, str(seq), FW_HEAVY)
-                dll.ecTextOutR(10, 90, 18, b"Arial", stamp.encode("mbcs"), 0, FW_EXTRALIGHT, 0)
-                y = 130
-                for line in ("Ten SP    : " + str(item_name), "Ma SP     : " + str(parcel_code),
-                             "Ma Pallet : " + str(pallet_code), "Ma Lenh   : " + str(wh_code),
-                             "K.Luong   : " + str(weight_g) + " gam"):
-                    self._text(dll, 10, y, 18, line, FW_SEMIBOLD)
-                    y += 30
+                dll.ecTextOutR(STAMP_X, STAMP_Y, STAMP_H, b"Arial", stamp.encode("mbcs"), 0,
+                               FW_SEMIBOLD, 0)
+                h, name = wrap2(item_name)
+                for i, line in enumerate(name):
+                    self._text(dll, LEFT_X, NAME_Y + i * NAME_GAP, h, line, FW_SEMIBOLD)
+                for i, line in enumerate(("Ma Pallet : " + str(pallet_code),
+                                          "Ma Lenh   : " + str(wh_code),
+                                          "NSX       : " + str(mfg_date))):
+                    self._text(dll, LEFT_X, LINE_Y + i * LINE_GAP, LINE_H, line, FW_SEMIBOLD)
+                self._text(dll, LEFT_X, CODE_Y, CODE_H, str(parcel_code), FW_HEAVY)
                 code = str(parcel_code).encode("mbcs")
-                dll.Bar_QRcode(280, 40, 3, 2, b"L", 0, 10, len(code), 0, code)
+                dll.Bar_QRcode(QR_X, QR_Y, 3, 2, b"L", 0, QR_MUL, len(code), 0, code)
                 dll.sendcommand(b"E")
                 return True
             except Exception as e:

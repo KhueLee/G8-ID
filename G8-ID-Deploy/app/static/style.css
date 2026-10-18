@@ -38,37 +38,39 @@ nav a.navlink:hover { background: #fff; }
 
 main { flex: 1; min-height: 0; display: flex; }
 .tab { flex: 1; min-height: 0; min-width: 0; }
-#tab-home { display: grid; grid-template-columns: 370px 1fr 240px; gap: 2px; padding-top: 2px; }
+/* Trang chủ (2.2.0): cột trái rộng gấp 1,8 lần bản trước (370 -> 666 px), chữ to gấp đôi; bỏ ô log
+   (đã có ở thẻ Lịch sử Log); dải dưới cùng (vị trí - thông báo - Bắt đầu/Dừng) cao gấp đôi. */
+#tab-home { display: grid; grid-template-columns: min(666px, 48vw) minmax(0, 1fr) 240px; grid-template-rows: minmax(0, 1fr) 124px; gap: 2px; padding-top: 2px; }
 .left, .center, .right { display: flex; flex-direction: column; min-height: 0; gap: 2px; }
 
-.curbox { display: grid; grid-template-columns: 72px 1fr 1fr; gap: 2px; height: 104px; flex: none; }
+.curbox { display: grid; grid-template-columns: 270px 1fr 1fr; gap: 2px; flex: 1.6 1 0; min-height: 70px; }
 .curbox > div { background: #3a3a3a; display: flex; align-items: center; justify-content: center; }
-.curbox .lbl { color: #f90; font-size: 11px; font-weight: bold; padding: 4px; justify-content: flex-start; }
-.curbox .num { color: #f90; font-size: 68px; font-weight: bold; }
-.row { display: grid; grid-template-columns: 72px 1fr; gap: 2px; flex: none; min-height: 27px; }
-.row span { background: #3a3a3a; color: #f90; font-size: 11px; font-weight: bold; padding: 3px 4px; display: flex; align-items: center; }
-.row b { background: #3a3a3a; color: #f90; font-size: 15px; font-weight: normal; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; padding: 0 4px; }
-.logbox { flex: 1; min-height: 40px; background: #111; color: #ccc; font: 10px Consolas, monospace; overflow-y: auto; padding: 2px 4px; }
-.logbox div { border-bottom: 1px solid #222; padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
-.logbox .WARNING { color: #fc6; } .logbox .ERROR, .logbox .CRITICAL { color: #f66; }
-.positions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; height: 62px; flex: none; }
-.pos { background: #222; border: 4px solid #777; text-align: center; display: flex; flex-direction: column; justify-content: center; }
-.pos small { font-size: 8px; color: #ccc; } .pos b { font-size: 15px; color: #000; min-height: 18px; }
-.pos.on { background: #008000; border-color: #2e8b2e; animation: blink 1s steps(1) infinite; }  /* như bản cũ: Green <-> DarkGray mỗi 0,5 s */
-.pos.on small { color: #000; }
-@keyframes blink { 50% { background: #a9a9a9; } }
+.curbox .lbl { color: #f90; font-size: 22px; font-weight: bold; padding: 4px 8px; justify-content: flex-start; }
+.curbox .num { color: #f90; font-size: 72px; font-weight: bold; }
+.row { display: grid; grid-template-columns: 270px 1fr; gap: 2px; flex: 1 1 0; min-height: 0; }
+.row span { background: #3a3a3a; color: #f90; font-size: 22px; font-weight: bold; padding: 2px 8px; display: flex; align-items: center; line-height: 1.1; }
+.row b { background: #3a3a3a; color: #f90; font-size: 28px; font-weight: normal; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; padding: 0 6px; line-height: 1.15; }
 
 .tablewrap { flex: 1; min-height: 0; overflow-y: auto; background: repeating-linear-gradient(#3a3a3a 0 17px, #cfcfcf 17px 18px); }
-#list { width: 100%; border-collapse: collapse; font-size: 14px; }
+#list { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
 #list th { position: sticky; top: 0; background: #fff; color: #000; font-weight: normal; text-align: left; padding: 1px 4px; border-right: 1px solid #aaa; height: 20px; }
-#list td { padding: 0 4px; height: 18px; border-right: 1px solid #ddd; border-bottom: 1px solid #cfcfcf; color: #fff; background: #3a3a3a; white-space: nowrap; overflow: hidden; }
+#list td { padding: 0 4px; height: 18px; border-right: 1px solid #ddd; border-bottom: 1px solid #cfcfcf; color: #fff; background: #3a3a3a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #list tr.done td { color: #aaa; }
 #list tr.cur td { background: #1e8a1e; color: #fff; font-weight: bold; }
 #list tr.err td { background: #7a3a3a; }
-.msgbar { display: grid; grid-template-columns: 62px 1fr; gap: 2px; height: 62px; flex: none; }
+
+.bottom { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(300px, 30%) minmax(0, 1fr) 240px; gap: 2px; min-height: 0; }
+.positions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.pos { background: #222; border: 4px solid #777; text-align: center; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+.pos small { font-size: 16px; color: #ccc; } .pos b { font-size: 24px; color: #000; min-height: 28px; }
+.pos.on { background: #008000; border-color: #2e8b2e; animation: blink 1s steps(1) infinite; }  /* như bản cũ: Green <-> DarkGray mỗi 0,5 s */
+.pos.on small { color: #000; }
+@keyframes blink { 50% { background: #a9a9a9; } }
+.msgbar { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 2px; }
 .msgbar > div { background: #3a3a3a; display: flex; align-items: center; justify-content: center; }
-.arrow { color: #ffd500; font-size: 38px; }
-#message { font-size: 26px; font-weight: bold; text-align: center; padding: 0 8px; }
+.arrow { color: #ffd500; font-size: 60px; }
+#message { font-size: 44px; font-weight: bold; text-align: center; padding: 0 10px; line-height: 1.15; overflow: hidden; }
+.row b > .fit, #message > .fit { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .c-gray { color: #cfcfcf; } .c-orange { color: #ff6a2a; } .c-red { color: #ff3b3b; } .c-green { color: #2ecc40; } .c-lime { color: #adff2f; } .c-blue { color: #8ab4ff; }
 
 .wbox { background: #3a3a3a; text-align: center; height: 104px; flex: none; padding-top: 16px; }
@@ -81,8 +83,8 @@ main { flex: 1; min-height: 0; display: flex; }
 .cnt { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; height: 50px; flex: none; }
 .cnt span { background: #2f2f2f; display: flex; align-items: center; justify-content: center; }
 .cnt.pass span { color: #32cd32; } .cnt.fail span { color: #ff3b3b; }
-.ctrl { display: grid; grid-template-columns: 1fr 1fr; height: 62px; flex: none; }
-.ctrl button { border: none; font-size: 15px; font-weight: bold; cursor: pointer; }
+.ctrl { display: grid; grid-template-columns: 1fr 1fr; }
+.ctrl button { border: none; font-size: 24px; font-weight: bold; cursor: pointer; }
 .start { background: #2a2f8f; color: #fff; } .start:disabled { background: #2a2f5f; color: #777; cursor: default; }
 .stop { background: #fff; color: #000; }
 
@@ -90,6 +92,7 @@ main { flex: 1; min-height: 0; display: flex; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 12px; }
 .card { background: #383838; padding: 12px 14px; border-radius: 4px; }
 .card.wide { grid-column: 1 / -1; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
 .card h3 { margin: 0 0 8px; color: #f90; } .card h4 { margin: 12px 0 4px; color: #ccc; }
 .card label { display: block; margin: 6px 0; font-size: 13px; }
 .card label.chk { display: flex; align-items: center; gap: 6px; }
@@ -98,6 +101,7 @@ main { flex: 1; min-height: 0; display: flex; }
 .bar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; } .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .b { background: #1e6fd9; color: #fff; border: none; padding: 8px 14px; margin: 6px 6px 0 0; font-weight: bold; cursor: pointer; border-radius: 3px; }
+.b:disabled { opacity: .45; cursor: default; }
 .b.ok { background: #1e8a1e; } .b.warn { background: #c98500; } .b.danger { background: #b22; }
 .hint { color: #999; font-size: 12px; }
 table.kv td { padding: 3px 8px 3px 0; vertical-align: top; } table.kv td:first-child { color: #aaa; white-space: nowrap; }
@@ -117,3 +121,31 @@ table.grid button { margin: 0; padding: 3px 8px; }
 .testres.good { color: #4caf50; } .testres.bad, .hint.bad { color: #ff5252; }
 .card select:disabled { opacity: .5; }
 #comhint { white-space: pre-line; }
+
+/* Thẻ Thông số: bố cục và nút như phần mềm cũ (lệnh đang chờ / đã hoàn thành / mã định danh). */
+#tab-info { display: flex; flex-direction: column; background: #2b2b2b; padding: 6px; gap: 6px; }
+.ts-top { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; flex: none; }
+.ts-top label { color: #fff; font-size: 15px; display: flex; align-items: center; gap: 4px; }
+.ts-top label.stk { flex-direction: column; align-items: flex-start; gap: 0; }
+.ts-top label.stk small { color: #aaa; font-size: 11px; }
+.ts-top input { padding: 4px; font-size: 14px; background: #fff; color: #000; border: 1px solid #888; width: 140px; }
+.ts-top input[type=date] { width: auto; }
+.ts-stats { margin-left: auto; color: #ffd200; font-weight: bold; font-size: 15px; }
+.ts-stats b { color: #ffd200; }
+.ts-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+.ts-left { display: flex; flex-direction: column; gap: 6px; min-height: 0; min-width: 0; }
+.ts-right { display: flex; flex-direction: column; gap: 4px; min-height: 0; min-width: 0; }
+.ts-rhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; color: #f90; font-size: 15px; }
+.grp { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; border: 1px solid #777; margin: 0; padding: 2px 4px 4px; }
+.grp legend { color: #ddd; font-size: 12px; padding: 0 4px; }
+.gwrap { flex: 1; min-height: 80px; overflow: auto; background: #ababab; }
+table.dg { border-collapse: collapse; font-size: 13px; color: #000; min-width: 100%; }
+table.dg th { position: sticky; top: 0; background: #f0f0f0; font-weight: normal; text-align: left; padding: 3px 6px; border: 1px solid #c8c8c8; white-space: nowrap; z-index: 1; }
+table.dg td { background: #fff; padding: 2px 6px; border: 1px solid #d8d8d8; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+table.dg tr.sel td { background: #3399ff; color: #fff; }
+table.dg td.empty { background: #ababab; color: #333; cursor: default; }
+.gbtns { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 4px; flex: none; }
+.xb { border: 1px solid #777; color: #000; padding: 6px 12px; font-size: 14px; cursor: pointer; }
+.xb:disabled { opacity: .5; cursor: default; }
+.xb.cyan { background: #9ff; } .xb.green { background: #9f9; } .xb.peach { background: #fc9; }
+.xb.pink { background: #fbb; } .xb.lav { background: #ccf; } .xb.tk { background: #0cc; border: 2px solid #fff; font-weight: bold; }
