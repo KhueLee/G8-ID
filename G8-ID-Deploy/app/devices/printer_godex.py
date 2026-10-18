@@ -2,7 +2,8 @@
 
 Tem thùng 70x40 mm (560x320 điểm, 8 điểm/mm), bố cục từ bản 2.3.0:
   khu 1 (trên mã QR): giờ in tem (không in ngày in - ngày trên tem chỉ là NSX)
-  cột trái: logo, số thứ tự thùng, tên sản phẩm (chữ đậm, tối đa 3 dòng), mã pallet, mã lệnh, NSX
+  cột trái: logo, số thứ tự thùng, tên sản phẩm (chữ đậm, tối đa 3 dòng), quy cách (số chiếc /
+    thùng, thay dòng mã pallet từ bản 2.3.3), mã lệnh, NSX
   mã QR và khu 2 (dải dưới cùng), từ bản 2.3.1: nguyên phần tử Carton_List WMS gửi
     (vd. TRU_V01_10W_AT|||||||48|0|G8HOME...||001||||||||01). Đọc lại tem thì phần mềm mới tách
     mã định danh (phần thứ 10) ra để so khớp.
@@ -30,7 +31,7 @@ LEFT_X, LEFT_W = 10, 282               # cột chữ bên trái mã QR
 NAME_Y, NAME_BOX, NAME_LEAD = 86, 96, 3  # tên sản phẩm: khung cao 96 điểm, dòng cách dòng h+3
 NAME_SIZES = (32, 30, 28, 26, 24, 22, 20, 18)  # cỡ chữ tên SP: lấy cỡ lớn nhất còn vừa khung
 NAME_MAX_LINES = 3
-LINE_Y, LINE_GAP, LINE_H = 186, 32, 22  # mã pallet / mã lệnh / NSX
+LINE_Y, LINE_GAP, LINE_H = 186, 32, 22  # quy cách / mã lệnh / NSX
 CODE_Y, CODE_H = 286, 28               # khu 2: nguyên phần tử Carton_List, cả chiều ngang tem
 CODE_W = 540                           # bề rộng khu 2 (điểm)
 CHAR_W = 0.55                          # bề rộng trung bình 1 ký tự Arial ~ 0,55 x cỡ chữ
@@ -225,7 +226,7 @@ class GodexPrinter:
         dll.ecTextOutRW(x, y, h, b"Arial", data, 0, weight, 0, len(text))
 
     def print_carton(self, parcel_code, item_name, pallet_code, wh_code, mfg_date="", seq=None,
-                     received_code=""):
+                     received_code="", spec=""):
         with self._lock:
             if not self._open:
                 return False
@@ -243,7 +244,7 @@ class GodexPrinter:
                 h, name = wrap_name(item_name)
                 for i, line in enumerate(name):
                     self._text(dll, LEFT_X, NAME_Y + i * (h + NAME_LEAD), h, line, FW_BOLD)
-                for i, line in enumerate(("Ma Pallet : " + str(pallet_code),
+                for i, line in enumerate(("Quy cach  : " + str(spec),
                                           "Ma Lenh   : " + str(wh_code),
                                           "NSX       : " + str(mfg_date))):
                     self._text(dll, LEFT_X, LINE_Y + i * LINE_GAP, LINE_H, line, FW_SEMIBOLD)

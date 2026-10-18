@@ -71,6 +71,15 @@ def fmt_date(v):
     return s
 
 
+def spec_text(p):
+    """Quy cách in trên tem: "<số> chiec" theo Inner_Carton; lệnh không gửi thì Qty / Ctn."""
+    p = p or {}
+    n = to_int(p.get("inner_carton"))
+    if n <= 0 and to_int(p.get("ctn")) > 0 and to_int(p.get("qty")) % to_int(p.get("ctn")) == 0:
+        n = to_int(p.get("qty")) // to_int(p.get("ctn"))
+    return "%d chiec" % n if n > 0 else ""
+
+
 def parse_carton(raw):
     """Carton_List: có hơn 10 phần ngăn bởi '|' thì mã thùng là phần thứ 10, không thì nguyên chuỗi."""
     received = str(raw or "").strip()
@@ -755,7 +764,7 @@ class Engine:
         printed = self.dev.printer.print_carton(
             code, p.get("item_name") or p.get("item_code", ""), pallet_id,
             p.get("wh_code", ""), mfg, seq=parcel.get("seq"),
-            received_code=parcel.get("received_code", ""))
+            received_code=parcel.get("received_code", ""), spec=spec_text(p))
         self.db.parcels.update_one({"_id": parcel["_id"]},
                                    {"$inc": {"print_count": 1}, "$set": {"mfg_date": mfg}})
         log.info("%s [PRINTER] in tem thùng: %s (%d ms), lần in thứ %d", tag,
@@ -1014,7 +1023,7 @@ class Engine:
         ok = self.dev.printer.print_carton(r["parcel_code"], p.get("item_name") or p.get("item_code", ""),
                                            r["pallet_id"], p.get("wh_code", ""),
                                            r.get("mfg_date") or self._mfg_for(p), seq=r.get("seq"),
-                                           received_code=r.get("received_code", ""))
+                                           received_code=r.get("received_code", ""), spec=spec_text(p))
         log.info("In lại tem thùng %s: %s", r["parcel_code"], "OK" if ok else "LỖI")
         if not ok:
             raise OrderError("IN LỖI " + r["parcel_code"])
@@ -1088,7 +1097,8 @@ class Engine:
                 code = r["parcel_code"]
                 ok = printer.print_carton(code, p.get("item_name") or p.get("item_code", ""), pid,
                                           p.get("wh_code", ""), r.get("mfg_date") or self._mfg_for(p),
-                                          seq=r.get("seq"), received_code=r.get("received_code", ""))
+                                          seq=r.get("seq"), received_code=r.get("received_code", ""),
+                                          spec=spec_text(p))
                 log.info("[REPRINT] pallet %s thùng %s (STT %s): %s", pid, code, r.get("seq"),
                          "OK" if ok else "LỖI")
                 if not ok:
@@ -1234,7 +1244,7 @@ class Engine:
             raise OrderError("Không có ParcelCode nào thuộc pallet hiện tại.")
         mfg = self._mfg_for(p)
         return {"pallet_id": p["pallet_id"], "item": p.get("item_name") or p.get("item_code", ""),
-                "wh_code": p.get("wh_code", ""),
+                "wh_code": p.get("wh_code", ""), "spec": spec_text(p),
                 "rows": [{"seq": r["seq"], "code": r["parcel_code"],
                           "full": r.get("received_code") or r["parcel_code"],
                           "mfg_date": r.get("mfg_date") or mfg} for r in rows]}
