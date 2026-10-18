@@ -357,25 +357,34 @@ body { font-family: Arial, sans-serif; background: #ccc; }
 """
 
 
+def code_style(text):
+    """Khu 2 trang PDF: chữ thu nhỏ cho vừa 1 dòng như tem Godex. Chuỗi dài in đậm 700 vì đậm 900
+    trên Chrome là Arial Black (rộng hơn ~13%)."""
+    from .devices.printer_godex import text_em
+    size = min(3.4, 67.4 / max(text_em(text), 1))
+    return "font-size:%.2fmm" % size + ("" if size >= 3.4 else ";font-weight:700")
+
+
 def label_page(data):
-    """Trang in tem của cả pallet, bố cục giống tem Godex (khu 1 giờ in, khu 2 mã định danh)."""
+    """Trang in tem của cả pallet, bố cục giống tem Godex (khu 1 giờ in, khu 2 nguyên phần tử Carton_List)."""
     try:
         import segno
     except ImportError:
         segno = None
-    stamp = datetime.datetime.now().strftime("%Hh%Mp%Ss")
+    stamp =datetime.datetime.now().strftime("%Hh%Mp%Ss")
     e = html.escape
     out = []
     for r in data["rows"]:
-        qr = segno.make(r["code"], error="l", micro=False).svg_inline(scale=1, border=0, omitsize=True) \
+        qr = segno.make(r["full"], error="l", micro=False).svg_inline(scale=1, border=0, omitsize=True) \
             if segno else "<b>(thiếu thư viện segno - chạy install.bat)</b>"
         out.append(
             '<div class="tem"><div class="l"><div class="top"><span class="logo">G8HOME</span>'
             '<span class="seq">%s</span></div><div class="name">%s</div>'
             '<div>Ma Pallet : %s</div><div>Ma Lenh&nbsp;&nbsp; : %s</div><div>NSX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : %s</div></div>'
-            '<div class="r"><div class="stamp">%s</div>%s</div><div class="code">%s</div></div>'
+            '<div class="r"><div class="stamp">%s</div>%s</div>'
+            '<div class="code" style="%s">%s</div></div>'
             % (r["seq"], e(data["item"]), e(data["pallet_id"]), e(data["wh_code"]),
-               e(r["mfg_date"]), stamp, qr, e(r["code"])))
+               e(r["mfg_date"]), stamp, qr, code_style(r["full"]), e(r["full"])))
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Tem pallet %s</title>'
             '<style>%s</style></head><body><div class="bar">Pallet <b>%s</b> - %d tem. '
             '<button onclick="print()">In / Lưu PDF</button> Chọn máy in "Save as PDF" (Lưu dưới '

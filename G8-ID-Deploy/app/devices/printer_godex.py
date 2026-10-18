@@ -3,7 +3,9 @@
 Tem thùng 70x40 mm (560x320 điểm, 8 điểm/mm), bố cục từ bản 2.3.0:
   khu 1 (trên mã QR): giờ in tem (không in ngày in - ngày trên tem chỉ là NSX)
   cột trái: logo, số thứ tự thùng, tên sản phẩm (chữ đậm, tối đa 3 dòng), mã pallet, mã lệnh, NSX
-  khu 2 (dải dưới cùng): mã định danh
+  mã QR và khu 2 (dải dưới cùng), từ bản 2.3.1: nguyên phần tử Carton_List WMS gửi
+    (vd. TRU_V01_10W_AT|||||||48|0|G8HOME...||001||||||||01). Đọc lại tem thì phần mềm mới tách
+    mã định danh (phần thứ 10) ra để so khớp.
 Mọi lệnh gọi DLL đi qua một khoá để không gọi chồng nhau.
 """
 import ctypes
@@ -21,15 +23,39 @@ LABEL_W_MM, LABEL_H_MM, GAP_MM = 70, 40, 3
 SPEED_IPS, DARKNESS = 4, 10
 FW_EXTRALIGHT, FW_SEMIBOLD, FW_BOLD, FW_HEAVY = 200, 600, 700, 900
 SEQ_X, SEQ_Y, SEQ_H = 125, 18, 64      # số thứ tự thùng: chữ to, cạnh logo, trái mã QR
-QR_X, QR_Y, QR_MUL = 300, 36, 9        # mã QR (bản 25 ô = 225 điểm) chừa chỗ khu 1 và khu 2
+QR_X, QR_Y, QR_MUL = 300, 36, 9        # mã QR: tối đa 9 điểm/ô (mã 23 ký tự = 25 ô = 225 điểm)
+QR_BOX = 250                           # cạnh tối đa (điểm) để chừa chỗ khu 1 và khu 2
 STAMP_X, STAMP_Y, STAMP_H = 300, 8, 20  # khu 1: giờ in
 LEFT_X, LEFT_W = 10, 282               # cột chữ bên trái mã QR
 NAME_Y, NAME_BOX, NAME_LEAD = 86, 96, 3  # tên sản phẩm: khung cao 96 điểm, dòng cách dòng h+3
 NAME_SIZES = (32, 30, 28, 26, 24, 22, 20, 18)  # cỡ chữ tên SP: lấy cỡ lớn nhất còn vừa khung
 NAME_MAX_LINES = 3
 LINE_Y, LINE_GAP, LINE_H = 186, 32, 22  # mã pallet / mã lệnh / NSX
-CODE_Y, CODE_H = 286, 28               # khu 2: mã định danh, cả chiều ngang tem
+CODE_Y, CODE_H = 286, 28               # khu 2: nguyên phần tử Carton_List, cả chiều ngang tem
+CODE_W = 540                           # bề rộng khu 2 (điểm)
 CHAR_W = 0.55                          # bề rộng trung bình 1 ký tự Arial ~ 0,55 x cỡ chữ
+
+
+def qr_mul(data):
+    """Số điểm mỗi ô QR: 9 như cũ, nhỏ lại khi chuỗi dài để mã không vượt QR_BOX. Số ô tính như
+    máy in (8-bit, mức sửa lỗi L): phần tử Carton_List 64 ký tự = 33 ô x 7 điểm = 231 điểm ~ 29 mm."""
+    try:
+        import segno
+        n = segno.make(data, error="l", mode="byte", micro=False,
+                       boost_error=False).symbol_size(border=0)[0]
+    except Exception:
+        n = 17 + 4 * max(1, -(-len(data.encode("utf-8")) // 16))   # ước lượng thô khi thiếu segno
+    return max(1, min(QR_MUL, QR_BOX // n))
+
+
+def text_em(text):
+    """Bề rộng chuỗi Arial đậm tính theo cỡ chữ (đo trên arialbd.ttf, lấy dư): '|' hẹp, còn lại ~0,62."""
+    return sum(0.28 if c in "|.,:;!'il" else 0.62 for c in str(text))
+
+
+def code_size(text, width=CODE_W, h=CODE_H):
+    """Cỡ chữ khu 2: lớn nhất tới CODE_H mà chuỗi vẫn vừa 1 dòng (64 ký tự -> ~16 điểm = 2 mm)."""
+    return max(8, min(h, int(width / max(text_em(text), 1))))
 
 
 def name_lines(h):
@@ -198,7 +224,8 @@ class GodexPrinter:
         data = text.encode("utf-16-le")
         dll.ecTextOutRW(x, y, h, b"Arial", data, 0, weight, 0, len(text))
 
-    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, mfg_date="", seq=None):
+    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, mfg_date="", seq=None,
+                     received_code=""):
         with self._lock:
             if not self._open:
                 return False
@@ -220,9 +247,12 @@ class GodexPrinter:
                                           "Ma Lenh   : " + str(wh_code),
                                           "NSX       : " + str(mfg_date))):
                     self._text(dll, LEFT_X, LINE_Y + i * LINE_GAP, LINE_H, line, FW_SEMIBOLD)
-                self._text(dll, LEFT_X, CODE_Y, CODE_H, str(parcel_code), FW_HEAVY)
-                code = str(parcel_code).encode("mbcs")
-                dll.Bar_QRcode(QR_X, QR_Y, 3, 2, b"L", 0, QR_MUL, len(code), 0, code)
+                full = str(received_code or parcel_code)
+                ch = code_size(full)
+                self._text(dll, LEFT_X, CODE_Y + (CODE_H - ch) // 2, ch, full,
+                           FW_HEAVY if ch == CODE_H else FW_BOLD)
+                code = full.encode("mbcs")
+                dll.Bar_QRcode(QR_X, QR_Y, 3, 2, b"L", 0, qr_mul(full), len(code), 0, code)
                 dll.sendcommand(b"E")
                 return True
             except Exception as e:

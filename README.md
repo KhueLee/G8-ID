@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.3.0)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.3.1)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -222,10 +222,11 @@ Component rồi mở lại `chay_dinh_danh.bat`.
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.3.0 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.3.1 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|
+| 2.3.1 | Tem: **mã QR và dải dưới cùng đều là nguyên phần tử `Carton_List`** WMS gửi (vd. `TRU_V01_10W_AT\|\|\|\|\|\|\|48\|0\|G8HOME…\|\|001\|…\|01`) để nhà máy đọc mã sản phẩm. Đầu đọc quét tem → phần mềm tách mã định danh (phần thứ 10) rồi mới so khớp với thùng đang làm. Chuỗi dài: mã QR tự nhỏ ô lại cho vừa khung (64 ký tự = 33 ô x 7 điểm ~ 29 mm), chữ dải dưới tự thu cho vừa 1 dòng (~2 mm). Trang *In PDF mã hiện tại* in giống vậy. |
 | 2.3.0 | Tem: bỏ ngày in (khu trên mã QR chỉ còn giờ in); tên sản phẩm chữ to hơn, in đậm, tối đa 3 dòng; dải dưới cùng là mã định danh WMS gửi xuống = nội dung mã QR. Trang chủ: *Số thùng hoàn thành* tính theo lệnh – tổng thùng đã làm / tổng thùng cần làm của mọi pallet thuộc lệnh (pallet đã xong tính đủ số thùng của pallet, pallet nạp lại từ lịch sử không bị đếm 2 lần). |
 | 2.2.0 | Trang chủ: bỏ ô log, cột thông tin rộng hơn 1,8 lần, chữ to gấp đôi; dải thông báo dưới cùng cao gấp đôi, chữ dài tự xuống 2 dòng. Cài đặt: thêm *Cài đặt vận hành* – sửa tay ngày sản xuất (NSX) của lệnh chưa định danh; thông tin trạm chuyển từ thẻ Thông số sang. Thông số: bố cục và nút như phần mềm cũ (In PDF mã hiện tại, Thành công ảo, Tải lệnh mới, Xóa lệnh đang làm, Gửi định danh, Thực hiện lại, Tải mã định danh, In lại mã định danh). Bấm Định danh / Gửi định danh: gửi ngay, không hỏi xác nhận. Tem: bỏ khối lượng, thêm NSX; giờ in lên trên mã QR, mã định danh xuống dải dưới cùng, bỏ chữ "Ten SP" / "Ma SP", tên SP in 2 dòng. Thư viện mới `segno` (mã QR trang PDF) – `update.bat` tự chạy `install.bat`. |
 | 2.1.0 | Bản thay thế `VTP_Induction.exe`: Python + MongoDB, giao diện Chrome, mô phỏng, HYBRID, tự dò cổng COM. |

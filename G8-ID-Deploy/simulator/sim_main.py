@@ -32,6 +32,7 @@ lock = threading.Lock()
 S = {
     "scale_online": True, "weight": 0, "noise": 2,
     "barcode_online": True, "barcode_mode": "ok", "barcode_delay_ms": 300, "last_code": "",
+    "last_parcel": "",
     "printer_online": True, "printer_fail": False, "labels": [],
     "plc_online": True, "light": "off",
     "server_mode": "ok", "received": [],
@@ -106,13 +107,14 @@ def dev_barcode():
             note("[SIM PDA] Không đọc được barcode")
         return jsonify(code="")
     time.sleep(S["barcode_delay_ms"] / 1000.0)
+    wrong = "WRONG_" + (S["last_parcel"] or code)     # tem của thùng khác: mã định danh khác
     if mode == "wrong":
-        note("[SIM PDA] Đọc sai barcode=WRONG_" + code)
-        return jsonify(code="WRONG_" + code)
+        note("[SIM PDA] Đọc sai barcode=" + wrong)
+        return jsonify(code=wrong)
     if mode == "wrong_once":
         S["barcode_mode"] = "ok"
-        note("[SIM PDA] Đọc sai 1 lần barcode=WRONG_" + code)
-        return jsonify(code="WRONG_" + code)
+        note("[SIM PDA] Đọc sai 1 lần barcode=" + wrong)
+        return jsonify(code=wrong)
     note("[SIM PDA] Đọc đúng barcode=" + code)
     return jsonify(code=code)
 
@@ -124,7 +126,8 @@ def dev_printer():
         note("[SIM PRINT] Giả lập IN LỖI. Code=%s" % b.get("code"))
         return jsonify(ok=False)
     with lock:
-        S["last_code"] = str(b.get("code", ""))
+        S["last_code"] = str(b.get("received_code") or b.get("code", ""))   # nội dung mã QR
+        S["last_parcel"] = str(b.get("code", ""))
         S["labels"].append(b)
         del S["labels"][:-30]
     note("[SIM PRINT] In giả lập OK. %s" % json.dumps(b, ensure_ascii=False))

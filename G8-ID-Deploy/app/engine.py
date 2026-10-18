@@ -754,7 +754,8 @@ class Engine:
         mfg = self._mfg_for(p)
         printed = self.dev.printer.print_carton(
             code, p.get("item_name") or p.get("item_code", ""), pallet_id,
-            p.get("wh_code", ""), mfg, seq=parcel.get("seq"))
+            p.get("wh_code", ""), mfg, seq=parcel.get("seq"),
+            received_code=parcel.get("received_code", ""))
         self.db.parcels.update_one({"_id": parcel["_id"]},
                                    {"$inc": {"print_count": 1}, "$set": {"mfg_date": mfg}})
         log.info("%s [PRINTER] in tem thùng: %s (%d ms), lần in thứ %d", tag,
@@ -765,18 +766,20 @@ class Engine:
             return
         self._sleep(1.5)
 
-        # 3) Đọc lại mã vừa in (như bản cũ): chờ tới khi đầu đọc trả mã; mã sai thì đọc lần 2
-        read = ""
+        # 3) Đọc lại mã vừa in (như bản cũ): chờ tới khi đầu đọc trả mã; mã sai thì đọc lần 2.
+        #    QR chứa nguyên phần tử Carton_List -> tách mã định danh (phần thứ 10) rồi mới so.
+        read = got = ""
         for i, text in ((1, "ĐANG ĐỌC MÃ VẠCH..."), (2, "ĐỌC MÃ LỖI - ĐANG THỬ ĐỌC LẠI LẦN 2...")):
             t0 = time.time()
             read = self._read_code(text)
-            match = read == code
-            log.info("%s [BARCODE] lần %d: mong đợi '%s', nhận '%s' sau %d ms -> %s", tag, i,
-                     code, read, (time.time() - t0) * 1000, "KHỚP" if match else "SAI")
-            if match:
+            got = parse_carton(read)[0]
+            log.info("%s [BARCODE] lần %d: mong đợi '%s', nhận '%s' (mã định danh '%s') sau %d ms -> %s",
+                     tag, i, code, read, got, (time.time() - t0) * 1000,
+                     "KHỚP" if got == code else "SAI")
+            if got == code:
                 break
             self._sleep(0.3)
-        if read != code:
+        if got != code:
             self._ng(tag, parcel, "barcode", "KHÔNG ĐỌC ĐƯỢC MÃ VẠCH - BỎ RA KHỎI CÂN",
                      weight=final, read=read)
             return
@@ -787,7 +790,7 @@ class Engine:
         self._count(True)
         self.current_code = ""            # dòng xanh nhảy sang thùng "Chờ in" kế tiếp
         self._big("OK", LIME)
-        self._msg("MÃ VẠCH:" + read, LIME)
+        self._msg("MÃ VẠCH:" + got, LIME)
         self._light("green")
         self._need_zero = True
         log.info("%s [PROCESS] ĐÃ HOÀN THÀNH IN THÙNG %s", tag, code)
@@ -1010,7 +1013,8 @@ class Engine:
         p = self.db.pallets.find_one({"pallet_id": r["pallet_id"]}) or {}
         ok = self.dev.printer.print_carton(r["parcel_code"], p.get("item_name") or p.get("item_code", ""),
                                            r["pallet_id"], p.get("wh_code", ""),
-                                           r.get("mfg_date") or self._mfg_for(p), seq=r.get("seq"))
+                                           r.get("mfg_date") or self._mfg_for(p), seq=r.get("seq"),
+                                           received_code=r.get("received_code", ""))
         log.info("In lại tem thùng %s: %s", r["parcel_code"], "OK" if ok else "LỖI")
         if not ok:
             raise OrderError("IN LỖI " + r["parcel_code"])
@@ -1084,7 +1088,7 @@ class Engine:
                 code = r["parcel_code"]
                 ok = printer.print_carton(code, p.get("item_name") or p.get("item_code", ""), pid,
                                           p.get("wh_code", ""), r.get("mfg_date") or self._mfg_for(p),
-                                          seq=r.get("seq"))
+                                          seq=r.get("seq"), received_code=r.get("received_code", ""))
                 log.info("[REPRINT] pallet %s thùng %s (STT %s): %s", pid, code, r.get("seq"),
                          "OK" if ok else "LỖI")
                 if not ok:
@@ -1232,6 +1236,7 @@ class Engine:
         return {"pallet_id": p["pallet_id"], "item": p.get("item_name") or p.get("item_code", ""),
                 "wh_code": p.get("wh_code", ""),
                 "rows": [{"seq": r["seq"], "code": r["parcel_code"],
+                          "full": r.get("received_code") or r["parcel_code"],
                           "mfg_date": r.get("mfg_date") or mfg} for r in rows]}
 
     def print_manual(self, text):

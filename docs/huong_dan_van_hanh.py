@@ -225,8 +225,9 @@ def build():
         "đầu đọc → <b>ĐANG ĐỌC MÃ VẠCH...</b> Số to ở góc trên tem (cạnh logo) là "
         "<b>số thứ tự của thùng trong pallet</b> (1, 2, 3 …), giống cột STT trong danh sách thùng. "
         "Tem gồm: giờ in (trên mã QR, không in ngày in), tên sản phẩm (chữ to, in đậm, tối đa "
-        "3 dòng), mã pallet, mã lệnh, <b>NSX</b> (ngày sản xuất) và <b>mã định danh</b> ở dải "
-        "dưới cùng – đây là mã WMS gửi xuống, cũng chính là nội dung mã QR.",
+        "3 dòng), mã pallet, mã lệnh, <b>NSX</b> (ngày sản xuất). <b>Mã QR</b> và <b>dải dưới cùng</b> "
+        "đều là <b>nguyên chuỗi thùng WMS gửi xuống</b> (mã SP|…|mã định danh G8HOME…|…) để nhà "
+        "máy đọc mã sản phẩm; khi đầu đọc quét tem, phần mềm tách mã định danh ra để so khớp.",
         "Thùng đạt: ô lớn <font color='#1e8a1e'><b>OK</b></font>, đèn xanh. Lấy thùng ra khỏi cân; "
         "khi thấy <b>SẴN SÀNG CHO SẢN PHẨM MỚI</b> thì đặt thùng tiếp theo.",
         "Đủ thùng của pallet: thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "

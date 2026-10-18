@@ -78,7 +78,8 @@ def check(name, fn):
 # ---------------------------------------------------------------- kiểm tra đơn vị
 def unit_tests():
     from app.devices.scale import parse_weight
-    from app.devices.printer_godex import CHAR_W, LEFT_W, NAME_BOX, name_lines, wrap_name
+    from app.devices.printer_godex import (CHAR_W, CODE_H, CODE_W, LEFT_W, NAME_BOX, QR_BOX,
+                                          code_size, name_lines, qr_mul, text_em, wrap_name)
     from app.engine import field, fmt_date, parse_carton
 
     def t_scale():
@@ -114,9 +115,20 @@ def unit_tests():
         assert len(lines) == 3 and lines[2].endswith("…"), lines
         assert wrap_name("") == (32, [])
 
+    def t_label_code():
+        full = "TRU_V01_10W_AT|||||||48|0|G8HOME14842246343127001||001||||||||01"
+        h = code_size(full)
+        assert 14 <= h < CODE_H and text_em(full) * h <= CODE_W, h   # vừa 1 dòng, ~2 mm
+        assert text_em(full) >= 32.57                                 # không hẹp hơn Arial đậm thật
+        assert code_size("G8HOME14842246343127001") == CODE_H         # mã ngắn: chữ to như cũ
+        assert qr_mul("G8HOME14842246343127001") == 9                 # mã ngắn: QR như cũ
+        assert qr_mul(full) == 7 and 33 * 7 <= QR_BOX                 # QR nguyên phần tử: 33 ô
+        assert parse_carton(full)[0] == "G8HOME14842246343127001"     # đọc QR -> tách mã định danh
+
     check("Phân tích bản tin cân (g / kg / rác)", t_scale)
     check("Ngày sản xuất từ lệnh đổi về dd/mm/yyyy", t_mfg_fmt)
     check("Tem: tên sản phẩm chữ to, chia tối đa 3 dòng", t_label_name)
+    check("Tem: QR + dòng cuối là nguyên phần tử Carton_List, vừa khung", t_label_code)
     check("Tách mã thùng từ Carton_List", t_carton)
     check("Đọc trường không phân biệt hoa thường", t_field)
     check("Driver cân RS232: đọc luồng, mất tín hiệu, tự mở lại cổng, đóng sạch", t_serial_scale)
