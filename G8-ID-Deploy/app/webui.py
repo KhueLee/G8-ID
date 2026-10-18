@@ -3,6 +3,7 @@
   - Cổng nhận lệnh (mặc định 0.0.0.0:8500): /ids/orderTask/, /ids/cancelTask/, /ids/confirm_product/
     - giữ nguyên đường dẫn và mã phản hồi của WcsHttpServer bản cũ.
 """
+import base64
 import datetime
 import html
 import json
@@ -346,6 +347,7 @@ body { font-family: Arial, sans-serif; background: #ccc; }
 .l { font-size: 2.6mm; font-weight: 600; line-height: 1.25; overflow: hidden; }
 .top { display: flex; align-items: center; gap: 2mm; height: 9mm; }
 .logo { font-weight: 900; font-size: 4mm; color: #000; }
+img.logo { width: 12.5mm; height: 6.9mm; image-rendering: pixelated; }
 .seq { font-size: 8mm; font-weight: 900; }
 .name { font-size: 3mm; font-weight: 700; line-height: 1.12; height: 10.1mm; overflow: hidden;
         margin: .4mm 0 .6mm; }
@@ -365,25 +367,36 @@ def code_style(text):
     return "font-size:%.2fmm" % size + ("" if size >= 3.4 else ";font-weight:700")
 
 
+def logo_html():
+    """Logo trên trang PDF: đúng ảnh máy in dùng (100x55 điểm = 12,5x6,9 mm); thiếu ảnh thì in chữ."""
+    try:
+        p = config.path(config.get()["devices"]["printer"].get("logo") or "drivers/G8_Label.bmp")
+        with open(p, "rb") as f:
+            return '<img class="logo" alt="G8HOME" src="data:image/bmp;base64,%s">' %                 base64.b64encode(f.read()).decode()
+    except Exception:
+        return '<span class="logo">G8HOME</span>'
+
+
 def label_page(data):
     """Trang in tem của cả pallet, bố cục giống tem Godex (khu 1 giờ in, khu 2 nguyên phần tử Carton_List)."""
     try:
         import segno
     except ImportError:
         segno = None
-    stamp =datetime.datetime.now().strftime("%Hh%Mp%Ss")
+    logo = logo_html()
+    stamp = datetime.datetime.now().strftime("%Hh%Mp%Ss")
     e = html.escape
     out = []
     for r in data["rows"]:
         qr = segno.make(r["full"], error="l", micro=False).svg_inline(scale=1, border=0, omitsize=True) \
             if segno else "<b>(thiếu thư viện segno - chạy install.bat)</b>"
         out.append(
-            '<div class="tem"><div class="l"><div class="top"><span class="logo">G8HOME</span>'
+            '<div class="tem"><div class="l"><div class="top">%s'
             '<span class="seq">%s</span></div><div class="name">%s</div>'
             '<div>Ma Pallet : %s</div><div>Ma Lenh&nbsp;&nbsp; : %s</div><div>NSX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : %s</div></div>'
             '<div class="r"><div class="stamp">%s</div>%s</div>'
             '<div class="code" style="%s">%s</div></div>'
-            % (r["seq"], e(data["item"]), e(data["pallet_id"]), e(data["wh_code"]),
+            % (logo, r["seq"], e(data["item"]), e(data["pallet_id"]), e(data["wh_code"]),
                e(r["mfg_date"]), stamp, qr, code_style(r["full"]), e(r["full"])))
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Tem pallet %s</title>'
             '<style>%s</style></head><body><div class="bar">Pallet <b>%s</b> - %d tem. '
