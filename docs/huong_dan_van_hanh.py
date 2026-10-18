@@ -258,8 +258,10 @@ def build():
     s += table([
         ["Hộp thông báo", "Xử lý"],
         ["KIỂM TRA LẠI KẾT NỐI MÁY IN!!", "Bật máy in, kiểm tra cáp USB. Chỉ báo PRINTER phải xanh."],
-        ["KIỂM TRA LẠI KẾT NỐI PDA!!", "Kiểm tra cáp / nguồn đầu đọc. Chỉ báo BARCODE phải xanh."],
-        ["KIỂM TRA LẠI KẾT NỐI TỚI CÂN!!", "Kiểm tra nguồn / cáp cân. Chỉ báo SCALE phải xanh."],
+        ["KIỂM TRA LẠI KẾT NỐI PDA!!", "Kiểm tra cáp / nguồn đầu đọc. Chỉ báo BARCODE phải xanh. "
+                                       "Vẫn đỏ: kiểm tra cổng COM (mục A9)."],
+        ["KIỂM TRA LẠI KẾT NỐI TỚI CÂN!!", "Kiểm tra nguồn / cáp cân. Chỉ báo SCALE phải xanh. "
+                                           "Vẫn đỏ: kiểm tra cổng COM (mục A9)."],
         ["KẾT NỐI ĐÈN LỖI. TIẾP TỤC HAY KHÔNG?",
          "PLC chưa nối. Chọn OK để sản xuất không có đèn tháp, báo kỹ thuật kiểm tra PLC."],
         ["KHÔNG CÓ LỆNH SẢN XUẤT. CHỜ PHẢN HỒI HỆ THỐNG!", "Chưa có lệnh từ WMS. Chờ lệnh."],
@@ -316,7 +318,43 @@ def build():
          "ở đâu. Ô 4–6 chỉ để lưu (giống bản cũ)."],
     ], [42, 26, 106])
 
-    s += [CondPageBreak(70 * mm), P("A9. Cập nhật phần mềm (update.bat)", h2),
+    s += [CondPageBreak(90 * mm), P("A9. Cài đặt thiết bị: số bàn, cổng COM, kiểm tra kết nối", h2),
+          P("Thẻ <b>Cài đặt</b> → ô <b>Thiết bị</b>. Chỉ sửa được khi trạm đang <b>STOP</b>. Sửa "
+            "xong bấm <b>Lưu + kết nối lại thiết bị</b>.")]
+    s += table([
+        ["Mục", "Cách dùng"],
+        ["Số thứ tự bàn định danh", "Số của bàn này (1–999). Hiện ở góc đồng hồ trên thanh đầu "
+                                    "(vd <i>ST02 · Bàn 3 · AUTO</i>) và ở thẻ Thông số."],
+        ["Cổng (cân, đầu đọc, máy in, PLC)",
+         "Bấm vào ô để sổ danh sách: chỉ có các cổng COM <b>đang cắm trên máy</b>, kèm tên thiết "
+         "bị, và <b>None</b> (không dùng thiết bị đó). Cổng ghi <i>KHÔNG CÓ TRÊN MÁY</i> là cổng "
+         "cũ đã mất (cáp rút ra / đổi lỗ USB / driver lỗi) – phải chọn lại."],
+        ["Cổng bị mờ, ghi [đang dùng: …]",
+         "Cổng đó đã gán cho thiết bị khác. Mỗi cổng chỉ cho <b>một</b> thiết bị; muốn chuyển, "
+         "đặt thiết bị kia về None trước. Lưu mà còn trùng cổng sẽ bị báo lỗi."],
+        ["Dò lại cổng COM", "Bấm sau khi cắm thêm / cắm lại cáp để danh sách cổng cập nhật."],
+        ["Cổng COM của Logical Station (PLC)",
+         "Cổng của PLC đặt trong <i>Communication Settings Utility</i> (MX Component). Chọn đúng "
+         "cổng đó ở đây để phần mềm không cho cân / đầu đọc dùng trùng."],
+    ], [48, 126])
+    s += [CondPageBreak(55 * mm), P("<b>Nút Kiểm tra</b> (dưới mỗi thiết bị) thử ngay cổng đang chọn, chưa cần lưu. Chữ "
+            "<font color='#1e8a1e'><b>xanh – ĐẠT</b></font> là đúng thiết bị; chữ "
+            "<font color='#c62828'><b>đỏ</b></font> kèm lý do:")]
+    s += table([
+        ["Nút", "Phần mềm làm gì", "Đạt khi"],
+        ["Kiểm tra cân", "Nghe cổng 3 giây.", "Đọc ra khối lượng (vd <i>đang đọc 305 g</i>)."],
+        ["Kiểm tra đầu đọc", "Bật quét. <b>Đưa một mã vạch vào trước đầu đọc trong 6 giây.</b>",
+         "Đọc được mã. Báo <i>giống cân</i> = cổng này là của cân."],
+        ["Kiểm tra máy in", "Mở kết nối máy in.", "Mở được. Muốn chắc thì bấm <b>In thử</b>."],
+        ["Kiểm tra PLC", "Mở / đóng Logical Station.", "Nối được PLC."],
+    ], [34, 72, 68])
+    s += box(["<b>Không biết thiết bị nào ở cổng nào?</b> Chọn lần lượt từng cổng cho cân, bấm "
+              "<b>Kiểm tra cân</b> tới khi ĐẠT; làm tương tự với đầu đọc. Xong bấm <b>Lưu + kết "
+              "nối lại thiết bị</b>.",
+              "Không thấy cổng nào của cân / đầu đọc trong danh sách: kiểm tra cáp, bấm <b>Dò lại "
+              "cổng COM</b>; vẫn không có thì báo kỹ thuật (Phần C)."], SOFT, BRAND)
+
+    s += [CondPageBreak(70 * mm), P("A10. Cập nhật phần mềm (update.bat)", h2),
           P("Khi kỹ thuật phần mềm báo có bản mới, máy trạm cần có mạng:")]
     s += steps([
         "Tắt phần mềm (mục A7). Nếu phần mềm còn chạy, update.bat sẽ báo "
@@ -424,7 +462,8 @@ def build():
         "Thời điểm xảy ra lỗi (giờ:phút).",
         "Thư mục <b>logs</b> trong thư mục phần mềm (mỗi ngày một file). Có thể xem nhanh ở thẻ "
         "<b>Lịch sử Log</b>.",
-        "Chế độ đang chạy (AUTO / MANUAL / HYBRID) – ghi ở góc đồng hồ trên thanh đầu.",
+        "Mã trạm, số bàn và chế độ đang chạy (AUTO / MANUAL / HYBRID) – ghi ở góc đồng hồ trên "
+        "thanh đầu.",
     ])
     return s
 
