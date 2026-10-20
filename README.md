@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.1)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.2)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -211,7 +211,7 @@ Component rồi mở lại `chay_dinh_danh.bat`.
 | | |
 |---|---|
 | Nhận lệnh | `POST http://<IP trạm>:8500/ids/orderTask/` → `1000 SUCCESS` / `1001 <lý do>` |
-| Hủy lệnh | `POST …:8500/ids/cancelTask/`, body có `Task_ID` (hoặc `PO_ID` / `Pallet_ID`) |
+| Dừng PO | `POST …:8500/ids/cancelTask/`, body có `Task_ID` (hoặc `PO_ID` / `Pallet_ID`): hủy các pallet chờ của PO, giữ pallet đang làm để ĐỊNH DANH nốt |
 | Kết quả định danh | `POST …:8500/ids/confirm_product/`, body `PO_ID`, `Line_ID`, `Pallet_ID`, `Location`, `Status`, `Message` |
 | Gửi pallet | `POST pallet_done_url`, body `{Task_ID, PO_ID, WH_Code, Line_ID, palletID, Ctn}`; HTTP 2xx = xong, lỗi thì gửi lại mỗi 30 s |
 
@@ -231,10 +231,11 @@ Component rồi mở lại `chay_dinh_danh.bat`.
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.1 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.2 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|
+| 2.4.2 | **WMS/WCS dừng PO giữa chừng** (`cancelTask`): mở rộng từ `Task_ID` / `Pallet_ID` / `PO_ID` ra cả PO (cùng `PO_ID` hoặc `PO_Name`, vì WCS gửi mỗi pallet một `Task_ID`). Pallet chờ (`WAIT`) bị hủy – WMS chỉ gán trước, chưa sản xuất. Pallet đang làm được giữ: vẫn cân / in / đọc tiếp, nút ĐỊNH DANH (màn hình và nút trên tủ) sáng ngay, bấm lúc nào cũng được – gửi IF-03 với `Ctn` = số thùng đạt thực tế, định danh xong là hết PO; 0 thùng đạt thì chỉ đóng pallet (`CANCEL`), không gửi. Trước đây hủy luôn cả pallet đang làm, thùng đã in không được báo về server. |
 | 2.4.1 | **Nút vật lý trên tủ qua PLC** như bản cũ: M20 = START, M22 = STOP, M21 = ĐỊNH DANH, quét 200 ms, kích ở sườn lên (giữ nút không lặp, bit đang 1 lúc nối PLC không tự Bắt đầu). Làm đúng việc của nút trên màn hình; lỗi hiện ở dải thông báo. Địa chỉ bit sửa được ở `devices.plc.buttons`. Công cụ mô phỏng có 3 nút giả lập trong ô PLC. |
 | 2.4.0 | Lệnh WCS: đọc **`GW`** (kg / thùng, vd. `1.637`) đổi ra gam (1637 g) làm khối lượng chuẩn khi cân – trước đây chỉ đọc `Weight_ref` nên lệnh WCS thật luôn cân theo cài đặt trạm (300 g); `Weight_ref` (gam) vẫn nhận và dùng trước `GW`. `Pallet_Current` lấy ở cấp lệnh (đúng bản tin WCS), không có mới tìm trong `info_detail`; hiện ở thẻ Thông số cùng khối lượng chuẩn. Ngày sản xuất: sửa tay được cả khi lệnh đã có thùng đạt – áp dụng từ thùng in tiếp theo trở đi cho mọi pallet còn lại của lệnh, tem đã in giữ ngày cũ (lệnh làm qua nhiều ngày). Tem: dòng **"Mã lệnh"** in `PO_Name` (vd. `VAS-091026-3`, thiếu thì `PO_ID`) thay cho `WH_Code`; nhãn tiếng Việt có dấu ("Quy cách : 6 chiếc", "Mã lệnh", "NSX"), dữ liệu từ lệnh in nguyên như WCS gửi. Trang *In PDF mã hiện tại* in giống vậy. |
 | 2.3.3 | Tem: dòng "Ma Pallet" đổi thành **"Quy cach : N chiec"** – số chiếc / thùng lấy theo `Inner_Carton` của lệnh; lệnh không gửi `Inner_Carton` thì lấy `Qty / Ctn` (chia hết), không có cả hai thì để trống. Trang *In PDF mã hiện tại* in giống vậy. |

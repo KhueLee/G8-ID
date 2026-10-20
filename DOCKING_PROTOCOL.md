@@ -1,6 +1,6 @@
 # G8 ID – Docking protocol (giao tiếp trạm định danh ↔ WMS / WCS / RCS)
 
-Phiên bản phần mềm trạm: **2.4.1**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
+Phiên bản phần mềm trạm: **2.4.2**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
 (`G8-ID-Deploy/app/webui.py`, `app/engine.py`). Mục 8 liệt kê các điểm cần đối tác xác nhận.
 
 ## 1. Tổng quan
@@ -155,14 +155,28 @@ chọn No thì lệnh bị bỏ và trạm không báo ngược.
 
 | Trường | Ghi chú |
 |---|---|
-| `Pallet_ID` (`palletID`, `PalletId`) | Có thì chỉ hủy pallet này (ưu tiên cao nhất) |
-| `Task_ID` | Không có `Pallet_ID` thì hủy mọi pallet của tác vụ |
-| `PO_ID` | Không có hai trường trên thì hủy mọi pallet của lệnh |
+| `Pallet_ID` (`palletID`, `PalletId`) | Pallet thuộc lệnh cần dừng |
+| `Task_ID` | Tác vụ (pallet) thuộc lệnh cần dừng |
+| `PO_ID` | Lệnh cần dừng |
 
+Ý nghĩa: **WMS/WCS dừng cả PO đang làm giữa chừng.** Trạm tìm các pallet khớp với bất kỳ trường
+nào ở trên, rồi mở rộng ra **mọi pallet của PO đó** (cùng `PO_ID` hoặc `PO_Name`). Lý do: WCS gửi
+mỗi pallet một `Task_ID`.
+
+WMS chỉ gán trước mã pallet, không biết pallet đó thực tế đã được sản xuất hay chưa. Một pallet chỉ
+được ghi nhận là đã sản xuất sau khi trạm định danh xong (IF-03).
+
+| Pallet của PO | Trạm xử lý |
+|---|---|
+| Đang chờ (`WAIT`, chưa đến lượt) | Hủy: chuyển sang lịch sử với trạng thái `CANCEL`, không gửi IF-03 |
+| Pallet hiện tại (đang làm, kể cả đã đủ thùng đang chờ gửi) | **Giữ lại.** Vẫn cân, in và đọc tiếp được. Nút ĐỊNH DANH (màn hình hoặc nút trên tủ) sáng ngay, bấm lúc nào cũng được (khi hết hàng): trạm chốt pallet và gửi IF-03 với `Ctn` = số thùng đã đạt thực tế; định danh xong là hết PO. Lịch sử ghi `DONE` / `ORDER_STOPPED`. Nếu 0 thùng đạt thì bấm ĐỊNH DANH chỉ đóng pallet (`CANCEL`), không gửi IF-03. |
+
+- Màn hình báo “WMS DỪNG LỆNH - LÀM NỐT PALLET …, HẾT HÀNG THÌ BẤM ĐỊNH DANH”. Nếu không còn
+  pallet nào được giữ thì báo “HỦY LỆNH SẢN XUẤT-WMS YÊU CẦU”.
 - Không có trường nào → `400 {"code":1001,"desc":"Task_ID invalid"}`.
-- Pallet bị hủy (kể cả đang làm dở / đang chờ gửi) chuyển sang lịch sử với trạng thái `CANCEL`;
-  màn hình báo “HỦY LỆNH SẢN XUẤT-WMS YÊU CẦU”. Trạm **không** gửi IF-03 cho pallet đã hủy.
 - Không tìm thấy pallet nào khớp vẫn trả `200 SUCCESS` (hủy lặp lại không lỗi).
+- So với `VTP_Induction.exe`: bản cũ chỉ đọc `Task_ID`. Nếu là lệnh đang chạy thì bản cũ đánh dấu
+  `CANCEL` và cho bấm ĐỊNH DANH khi chưa đủ thùng; nếu là lệnh khác thì xóa hẳn.
 
 ## 5. IF-05 – Kết quả định danh pallet
 

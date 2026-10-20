@@ -283,8 +283,7 @@ class Engine:
                 r = self.start(confirm_no_light=True)   # nút đến từ PLC thì PLC đang nối
             elif name == "stop":
                 r = self.stop()
-            elif self.db.pallets.find_one({"status": "AWAIT_SEND"}, {"_id": 1}) is None \
-                    and self._front_pallet() is not None:
+            elif self._identify_target() is None and self._front_pallet() is not None:
                 r = {"ok": False, "error": "CHƯA ĐỦ SỐ LƯỢNG HÀNG!"}
             else:
                 r = self.identify()
@@ -479,27 +478,51 @@ class Engine:
             self._msg("ĐÃ NHẬN LỆNH MỚI - CHƯA TỰ BẮT ĐẦU ĐƯỢC: %s" % r.get("error"), RED)
 
     def cancel_task(self, data, reason="CANCEL"):
-        """IF /ids/cancelTask/: hủy theo Task_ID / PO_ID / Pallet_ID (nhận trường nào dùng trường đó)."""
+        """IF /ids/cancelTask/: WMS/WCS dừng lệnh sản xuất đang làm giữa chừng.
+
+        WCS gửi mỗi pallet một Task_ID, nên pallet khớp (Pallet_ID / Task_ID / PO_ID) được mở rộng
+        ra cả PO: pallet chờ (WAIT) bị hủy vì WMS chỉ gán trước, chưa sản xuất; pallet đang làm giữ
+        lại (order_stopped) để làm nốt và bấm ĐỊNH DANH bất cứ lúc nào - gửi số thùng thực tế, định
+        danh xong là hết PO. Công nhân hủy tay (reason khác CANCEL) chỉ hủy đúng pallet đã chọn.
+        """
         q = []
         pid = field(data, "palletID", "Pallet_ID", "PalletId")
         if pid:
             q.append({"pallet_id": str(pid).strip()})
         tid = field(data, "Task_ID")
-        if tid and not pid:
+        if tid:
             q.append({"task_id": str(tid)})
         po = to_int(field(data, "PO_ID"))
-        if po and not pid and not tid:
+        if po:
             q.append({"po_id": po})
         if not q:
             raise OrderError("Task_ID invalid")            # câu trả lời của bản cũ
+        ids, kept = [], []
         with self.lock:
-            ids = [p["pallet_id"] for p in self.db.pallets.find({"$or": q}, {"pallet_id": 1})]
-            for pallet_id in ids:
-                self._archive(pallet_id, "CANCEL", reason)
-        log.warning("XỬ LÝ HỦY LỆNH SẢN XUẤT: %s -> %d pallet bị hủy: %s", data, len(ids), ids)
-        if ids and reason == "CANCEL":
+            proj = {"pallet_id": 1, "po_key": 1, "po_id": 1, "status": 1}
+            hit = list(self.db.pallets.find({"$or": q}, proj))
+            keys = list({h["po_key"] for h in hit if h.get("po_key")})
+            pos = list({h["po_id"] for h in hit if h.get("po_id")})
+            if reason == "CANCEL" and (keys or pos):
+                hit = list(self.db.pallets.find({"$or": q + [{"po_key": {"$in": keys}},
+                                                             {"po_id": {"$in": pos}}]}, proj))
+            for p in hit:
+                # Chỉ giữ pallet đang làm (trạm làm từng pallet một); pallet chờ chưa sản xuất.
+                if reason == "CANCEL" and p["status"] in ACTIVE:
+                    self.db.pallets.update_one({"_id": p["_id"]}, {"$set": {"order_stopped": True}})
+                    kept.append(p["pallet_id"])
+                else:
+                    self._archive(p["pallet_id"], "CANCEL", reason)
+                    ids.append(p["pallet_id"])
+            self._dirty = True
+        log.warning("XỬ LÝ HỦY LỆNH SẢN XUẤT: %s -> %d pallet bị hủy: %s; giữ làm nốt: %s",
+                    data, len(ids), ids, kept)
+        if kept:
+            self._msg("WMS DỪNG LỆNH - LÀM NỐT PALLET %s, HẾT HÀNG THÌ BẤM ĐỊNH DANH"
+                      % ", ".join(kept), RED)
+        elif ids and reason == "CANCEL":
             self._msg("HỦY LỆNH SẢN XUẤT-WMS YÊU CẦU", RED)
-        self.event("cancel", request=data, pallets=ids)
+        self.event("cancel", request=data, pallets=ids, kept=kept)
         return ids
 
     def confirm_product(self, data):
@@ -780,7 +803,10 @@ class Engine:
         if w is None:
             return
         if w < s["zero_threshold_g"]:
-            self._msg("CHỜ ĐẶT SẢN PHẨM LÊN CÂN", GRAY)
+            if p.get("order_stopped"):
+                self._msg("CHỜ ĐẶT SẢN PHẨM LÊN CÂN - LỆNH ĐÃ DỪNG, HẾT HÀNG THÌ BẤM ĐỊNH DANH", RED)
+            else:
+                self._msg("CHỜ ĐẶT SẢN PHẨM LÊN CÂN", GRAY)
             self._big("RUN", ORANGE)
             self._light("yellow")
             self._sleep(0.1)
@@ -962,14 +988,7 @@ class Engine:
             return
         s, pid = self.settings, p["pallet_id"]
         if p["status"] == "FINALIZING":
-            # Như bản cũ: đủ thùng là chốt pallet và chờ ĐỊNH DANH, không in tem pallet.
-            with self.lock:
-                self.db.parcels.update_many({"pallet_id": pid, "status": {"$gte": 1}},
-                                            {"$set": {"status": 4}})
-                self.db.pallets.update_one({"pallet_id": pid, "status": "FINALIZING"},
-                                           {"$set": {"status": "AWAIT_SEND", "closed_at": db.now()}})
-                self._dirty = True
-            self.event("pallet_closed", pallet_id=pid)
+            self._seal(pid)
 
         # Chờ gửi về server
         while True:
@@ -993,6 +1012,26 @@ class Engine:
         self._big("RUN", ORANGE)
         self._sleep(1.0)
 
+    def _seal(self, pid):
+        """Như bản cũ: đủ thùng là chốt pallet và chờ ĐỊNH DANH, không in tem pallet."""
+        with self.lock:
+            self.db.parcels.update_many({"pallet_id": pid, "status": {"$gte": 1}},
+                                        {"$set": {"status": 4}})
+            sealed = self.db.pallets.update_one(
+                {"pallet_id": pid, "status": "FINALIZING"},
+                {"$set": {"status": "AWAIT_SEND", "closed_at": db.now()}}).modified_count
+            self._dirty = True
+        if sealed:
+            self.event("pallet_closed", pallet_id=pid)
+
+    def _identify_target(self):
+        """Pallet nút ĐỊNH DANH sẽ gửi: pallet đủ thùng chờ gửi, không có thì pallet dở của lệnh
+        WMS đã dừng (gửi số thùng thực tế)."""
+        return self.db.pallets.find_one({"status": "AWAIT_SEND"}, sort=[("seq", ASCENDING)]) or \
+            self.db.pallets.find_one({"order_stopped": True,
+                                      "status": {"$in": ["PROCESSING", "FINALIZING"]}},
+                                     sort=[("seq", ASCENDING)])
+
     def identify(self, pallet_id=""):
         """Nút ĐỊNH DANH: gửi pallet đã chốt về server (dùng được cả khi đang STOP).
 
@@ -1002,13 +1041,40 @@ class Engine:
             p = self.db.pallets.find_one({"pallet_id": pallet_id})
             if p is None:
                 return {"ok": False, "error": "Không tìm thấy pallet %s." % pallet_id}
-            if p["status"] != "AWAIT_SEND":
+            if p["status"] != "AWAIT_SEND" and not p.get("order_stopped"):
                 return {"ok": False, "title": "CHƯA ĐỦ SỐ LƯỢNG HÀNG!",
                         "error": "Chưa quét đủ số thùng, không thể gửi thành công pallet!"}
         else:
-            p = self.db.pallets.find_one({"status": "AWAIT_SEND"}, sort=[("seq", ASCENDING)])
+            p = self._identify_target()
         if p is None:
             return {"ok": False, "error": "Chưa có pallet nào chờ định danh."}
+        if p["status"] != "AWAIT_SEND":
+            # Pallet dở của lệnh WMS đã dừng: chốt với số thùng đã đạt.
+            pid = p["pallet_id"]
+            ok_n = self.db.parcels.count_documents({"pallet_id": pid, "status": {"$gte": 1}})
+            log.warning("ĐỊNH DANH pallet %s của lệnh đã dừng khi chưa đủ thùng (%d/%d thùng đạt)",
+                        pid, ok_n, p.get("carton_count", 0))
+            if not ok_n:
+                # Chưa sản xuất thùng nào: không có gì để báo server, đóng pallet là xong.
+                self._archive(pid, "CANCEL", "ORDER_STOPPED")
+                self._msg("PALLET %s KHÔNG CÓ THÙNG ĐẠT - ĐÃ HỦY, KHÔNG GỬI SERVER" % pid, RED)
+                return {"ok": True}
+            self.db.pallets.update_one({"_id": p["_id"], "status": "PROCESSING"},
+                                       {"$set": {"status": "FINALIZING", "identify_requested": True}})
+            self._dirty = True
+            if self.running:
+                # Vòng chạy chốt pallet sau thùng đang cân/in rồi tự gửi; chờ một chút để báo kết quả.
+                for _ in range(30):
+                    if self.db.pallets.find_one({"pallet_id": pid, "status": "AWAIT_SEND"}, {"_id": 1}):
+                        break
+                    time.sleep(0.1)
+                else:
+                    return {"ok": True}
+            else:
+                self._seal(pid)
+            p = self.db.pallets.find_one({"pallet_id": pid})
+            if p is None:                                  # vòng chạy đã gửi xong
+                return {"ok": True}
         ok, err = self.send_pallet_done(p["pallet_id"])
         if ok:
             if not self.running:
@@ -1038,7 +1104,7 @@ class Engine:
                 log.error("GỬI PALLET LỖI: %s (%s)", pallet_id, err)
                 self._dirty = True
                 return False, err
-            self._archive(pallet_id, "DONE", "NORMAL")
+            self._archive(pallet_id, "DONE", "ORDER_STOPPED" if p.get("order_stopped") else "NORMAL")
             self._last_send.pop(pallet_id, None)
             self.event("pallet_done", pallet_id=pallet_id, body=body)
             return True, ""
@@ -1333,7 +1399,7 @@ class Engine:
             if not rows:
                 raise OrderError("Pallet này không còn danh sách thùng trong lịch sử.")
             for k in ("_id", "done_at", "done_reason", "carton_ok", "send_error", "send_attempts",
-                      "send_at", "identify_requested", "closed_at"):
+                      "send_at", "identify_requested", "closed_at", "order_stopped"):
                 p.pop(k, None)
             seq = self.db.meta.find_one_and_update({"_id": "pallet_seq"}, {"$inc": {"v": 1}},
                                                    upsert=True) or {"v": 0}
@@ -1355,7 +1421,7 @@ class Engine:
         c = {"pallet": None, "rows": [], "carton": [0, 0], "order": [0, 0], "pallets": [0, 0],
              "pos": -1, "queue": d.pallets.count_documents({"status": "WAIT"}),
              "has_order": d.pallets.count_documents({}, limit=1) > 0,
-             "can_identify": d.pallets.count_documents({"status": "AWAIT_SEND"}, limit=1) > 0}
+             "can_identify": self._identify_target() is not None}
         if p:
             rows = list(d.parcels.find({"pallet_id": p["pallet_id"]}).sort("seq", ASCENDING).limit(2000))
             c["rows"] = [{"stt": r["seq"], "code": r["parcel_code"], "pallet": r["pallet_id"],

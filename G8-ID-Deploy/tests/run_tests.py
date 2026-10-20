@@ -620,12 +620,21 @@ def e2e_tests(env):
         with urllib.request.urlopen(APP + "/labels?pallet=LPN03020", timeout=5) as g:
             page = g.read().decode("utf-8")
         assert "Mã lệnh" in page and "VAS-091026-3" in page and "6 chiếc" in page, page[-800:]
+        # WMS dừng lệnh khi pallet đang dở 1/2 thùng: giữ pallet, ĐỊNH DANH gửi 1 thùng.
+        sent = len(http(SIMU + "/sim/state")[1]["received"])
         s, r = http(ORDER + "/ids/cancelTask/", {"Task_ID": o["Task_ID"]})
-        assert s == 200 and not state()["has_order"], (s, r)
+        assert s == 200 and state()["has_order"] and state()["can_identify"], (s, r)
+        assert "WMS DỪNG LỆNH" in state()["message"], state()["message"]
+        assert http(APP + "/api/identify", {})[1]["ok"]
+        wait(lambda: not state()["has_order"], 10, "gửi pallet dở của lệnh đã dừng")
+        got = http(SIMU + "/sim/state")[1]["received"]
+        assert len(got) == sent + 1 and got[-1]["body"]["palletID"] == "LPN03020" and \
+            got[-1]["body"]["Ctn"] == 1, got[-1]
         http(APP + "/api/counter/reset", {})              # bộ đếm ngày về 0 cho các bài sau
 
     def t_full_order():
         db0 = http(APP + "/api/info")[1]["db"]                # lịch sử có sẵn từ các bài trước
+        sent = len(http(SIMU + "/sim/state")[1]["received"])
         o = order(2, 3)
         s = state()
         assert s["carton"] == [0, 3] and s["pallets"] == [0, 2] and s["order"] == [0, 6], s["carton"]
@@ -643,7 +652,7 @@ def e2e_tests(env):
                 assert state()["order"] == [3, 6], state()["order"]
         wait(lambda: not state()["running"], 15, "tự STOP khi hết lệnh")
         assert state()["message"] == "ĐÃ HOÀN TẤT LỆNH SẢN XUẤT", state()["message"]
-        got = http(SIMU + "/sim/state")[1]["received"]
+        got = http(SIMU + "/sim/state")[1]["received"][sent:]
         ids = [g["body"]["palletID"] for g in got]
         want = [d["Pallet_ID"] for d in o["info_detail"]]
         assert ids == want, "server nhận %s, mong %s" % (ids, want)
@@ -879,16 +888,61 @@ def e2e_tests(env):
         wait(lambda: not state()["running"], 10, "STOP")
         assert state()["rcs"] is True
 
+    def t_stop_order_running():
+        # Như WCS thật: PO 2 pallet x 3 thùng, mỗi pallet một bản tin / một Task_ID. Đang chạy
+        # pallet 1 được 1 thùng thì WMS dừng PO (gửi Task_ID của pallet 1): pallet 2 bị hủy,
+        # pallet đang làm giữ lại; bấm ĐỊNH DANH khi đang chạy gửi số thùng thực tế.
+        p1, p2 = "STOPPO1", "STOPPO2"
+        for n, pid in ((1, p1), (2, p2)):
+            cl = ["IT|||||||6|0|%s%03d||001||||||||01" % (pid, i) for i in (1, 2, 3)]
+            s, r = http(ORDER + "/ids/orderTask/", {
+                "Task_ID": "%d-555001__10:00:0%d" % (n, n), "PO_ID": 555001, "PO_Name": "VAS-STOP",
+                "WH_Code": "WH_TB", "Line_ID": "MCSX001", "Pallet_Current": n,
+                "info_detail": [{"Item_Code": "IT", "Item_Name": "Hàng thử dừng PO",
+                                 "Pallet_ID": pid, "Location": "S02.257.1", "Carton_List": cl,
+                                 "Ctn": 3, "Inner_Carton": 6, "GW": 0.3}]})
+            assert (s, r["code"]) == (200, 1000), (s, r)
+        if not state()["running"]:
+            start()
+        carton_ok(1)
+        assert not state()["can_identify"]
+        sent = len(http(SIMU + "/sim/state")[1]["received"])
+        s, r = http(ORDER + "/ids/cancelTask/", {"Task_ID": "1-555001__10:00:01"})
+        assert s == 200 and state()["running"], (s, r)
+        assert state()["pallet"]["pallet_id"] == p1 and state()["pallets"] == [0, 1], state()["pallets"]
+        assert state()["can_identify"]
+        wait(lambda: "LỆNH ĐÃ DỪNG" in state()["message"], 10, "báo lệnh đã dừng khi chờ thùng")
+        carton_ok(2)                                       # vẫn làm nốt được
+        assert http(APP + "/api/identify", {})[1]["ok"]
+        wait(lambda: not state()["has_order"], 15, "gửi pallet dở")
+        wait(lambda: not state()["running"], 15, "tự STOP khi hết lệnh")
+        got = http(SIMU + "/sim/state")[1]["received"]
+        assert [(g["body"]["palletID"], g["body"]["Ctn"]) for g in got[sent:]] == [(p1, 2)], got[sent:]
+        rows = http(APP + "/api/history?q=" + p2)[1]["rows"]
+        assert rows and rows[0]["status"] == "CANCEL", rows
+        http(APP + "/api/counter/reset", {})
+
     def t_cancel_and_duplicate():
         o = order(2, 2)
         s, r = http(ORDER + "/ids/orderTask/", o)          # WMS gửi lặp cùng lệnh
         assert s == 200 and r["code"] == 1000
         assert len(http(APP + "/api/info")[1]["queue"]) == 2, "lệnh lặp không được nhân đôi"
+        p1, p2 = [d["Pallet_ID"] for d in o["info_detail"]]
+        wait(lambda: state()["running"] and state()["pallet"]["pallet_id"] == p1, 10,
+             "lệnh mới tự Bắt đầu pallet 1")
+        sent = len(http(SIMU + "/sim/state")[1]["received"])
+        # Dừng PO khi pallet đang làm chưa có thùng đạt: vẫn giữ pallet đang làm, hủy pallet chờ.
         s, r = http(ORDER + "/ids/cancelTask/", {"Task_ID": o["Task_ID"]})
-        assert s == 200, (s, r)
-        assert not state()["has_order"]
-        rows = http(APP + "/api/history?q=" + o["info_detail"][0]["Pallet_ID"])[1]["rows"]
+        assert s == 200 and state()["has_order"] and state()["can_identify"], (s, r)
+        rows = http(APP + "/api/history?q=" + p2)[1]["rows"]
         assert rows and rows[0]["status"] == "CANCEL", rows
+        # ĐỊNH DANH khi 0 thùng đạt: đóng pallet, không gửi gì về server.
+        assert http(APP + "/api/identify", {})[1]["ok"]
+        wait(lambda: not state()["has_order"], 10, "đóng pallet 0 thùng")
+        assert len(http(SIMU + "/sim/state")[1]["received"]) == sent
+        rows = http(APP + "/api/history?q=" + p1)[1]["rows"]
+        assert rows and rows[0]["status"] == "CANCEL", rows
+        wait(lambda: not state()["running"], 10, "tự STOP khi hết lệnh")
         s, r = http(ORDER + "/ids/cancelTask/", {"foo": 1})
         assert (s, r["desc"]) == (400, "Task_ID invalid"), (s, r)
         s, r = http(ORDER + "/ids/confirm_product/", {"PO_ID": 0})
@@ -1001,6 +1055,8 @@ def e2e_tests(env):
           t_scale_lost_and_stop)
     check("Server lỗi: giữ pallet, tự gửi lại tới khi nhận", t_server_retry)
     check("Nút vật lý trên tủ (PLC): START / STOP / ĐỊNH DANH", t_plc_buttons)
+    check("WMS dừng lệnh khi đang chạy: hủy pallet sau, làm nốt + ĐỊNH DANH pallet dở",
+          t_stop_order_running)
     check("Lệnh gửi lặp không nhân đôi; cancelTask hủy lệnh; confirm_product", t_cancel_and_duplicate)
     check("Mất điện giữa lệnh: khởi động lại còn nguyên tiến độ", t_power_loss)
     check("HYBRID: thiết bị thật + WCS/RCS mô phỏng", t_hybrid)
