@@ -236,7 +236,8 @@ def build():
         "Đủ thùng của pallet: thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "
         "<b>Định danh</b> trên thanh đầu (hoặc nút <b>ĐỊNH DANH</b> trên tủ) – pallet được gửi lên "
         "server ngay, không hỏi xác nhận (nút chỉ bấm được khi pallet đã đủ thùng; bấm nút trên tủ "
-        "khi chưa đủ thì dòng thông báo báo <b>CHƯA ĐỦ SỐ LƯỢNG HÀNG!</b>).",
+        "khi chưa đủ thì dòng thông báo báo <b>CHƯA ĐỦ SỐ LƯỢNG HÀNG!</b>). Riêng khi WMS dừng PO "
+        "thì bấm được lúc nào cũng được – xem mục A4.",
         "Thấy <b>PALLET OK – TIẾP TỤC SẢN XUẤT</b> → làm pallet tiếp theo. Hết lệnh: "
         "<b>ĐÃ HOÀN TẤT LỆNH SẢN XUẤT</b>, trạm tự về STOP.",
     ])
@@ -264,7 +265,18 @@ def build():
          "Server chưa nhận (chỉ báo RCS đỏ). Máy tự gửi lại mỗi 30 giây; nếu kéo dài, báo bộ phận "
          "IT / WMS kiểm tra mạng và server."],
         ["LỖI GỬI ĐỊNH DANH VỀ WMS: ...", "WMS từ chối pallet. Chụp màn hình gửi bộ phận WMS."],
-        ["HỦY LỆNH SẢN XUẤT-WMS YÊU CẦU", "WMS đã hủy lệnh. Chờ lệnh mới."],
+        ["WMS DỪNG LỆNH - LÀM NỐT PALLET ..., HẾT HÀNG THÌ BẤM ĐỊNH DANH<br/>(khi chờ thùng: "
+         "CHỜ ĐẶT SẢN PHẨM LÊN CÂN - LỆNH ĐÃ DỪNG ...)",
+         "WMS dừng cả PO giữa chừng. Các pallet <b>chưa làm</b> của PO đã bị hủy; chỉ còn pallet "
+         "<b>đang làm</b>. Còn hàng thì cân tiếp như thường; <b>hết hàng</b> thì bấm <b>Định danh</b> "
+         "(hoặc nút ĐỊNH DANH trên tủ) – nút sáng ngay dù chưa đủ thùng, pallet được gửi lên server "
+         "với <b>đúng số thùng đã đạt</b>. Định danh xong là hết PO, trạm tự về STOP nếu không còn "
+         "lệnh khác. Thùng chưa làm của pallet không được ghi nhận."],
+        ["PALLET ... KHÔNG CÓ THÙNG ĐẠT - ĐÃ HỦY, KHÔNG GỬI SERVER",
+         "Bấm Định danh pallet của PO đã dừng khi chưa có thùng nào đạt: pallet bị hủy, không gửi "
+         "gì lên server. Chờ lệnh mới."],
+        ["HỦY LỆNH SẢN XUẤT-WMS YÊU CẦU", "WMS dừng PO khi trạm không có pallet đang làm của PO "
+         "đó – các pallet chờ đã bị hủy. Chờ lệnh mới."],
         ["LỖI HỆ THỐNG: ...", "Bấm Dừng → Bắt đầu. Lặp lại thì gửi log (Phần C)."],
     ], [70, 104])
 
@@ -423,7 +435,7 @@ def build():
         ["Xóa lệnh đang làm", "Hủy pallet, chuyển xuống bảng LỆNH ĐÃ HOÀN THÀNH (ĐÃ XÓA).",
          "Cần mật khẩu, phải Dừng trước. Làm lại bằng <b>Thực hiện lại</b>."],
         ["Gửi định danh", "Gửi ngay pallet đang chọn lên server, không hỏi xác nhận (như nút Định danh trên thanh đầu).",
-         "Pallet chưa đủ thùng: báo <i>CHƯA ĐỦ SỐ LƯỢNG HÀNG!</i>"],
+         "Pallet chưa đủ thùng: báo <i>CHƯA ĐỦ SỐ LƯỢNG HÀNG!</i> (trừ pallet đang làm của PO WMS đã dừng – gửi đúng số thùng đã đạt)."],
         ["Thực hiện lại", "Nạp lại pallet đã chọn ở bảng đã hoàn thành để làm lại từ đầu.",
          "Cần mật khẩu; chỉ khi không còn lệnh đang làm / chờ."],
         ["Tải mã định danh", "Hiện danh sách thùng của lệnh đã chọn (bên phải) và "
