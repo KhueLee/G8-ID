@@ -146,7 +146,7 @@ def unit_tests():
     check("Driver cân RS232: đọc luồng, mất tín hiệu, tự mở lại cổng, đóng sạch", t_serial_scale)
     check("Driver đầu đọc RS232: kích 16 54 0D / tắt 16 55 0D, hết giờ, Dừng", t_serial_barcode)
     check("Driver máy in: nạp được EZio DLL của bản cũ", t_printer_dll)
-    check("Driver PLC MX Component (control giả): Open, đèn M0/M1/M2/M10, mất nối, Close", t_plc_mx)
+    check("Driver PLC MX Component (control giả): Open, đèn, nút M20/M22/M21, mất nối, Close", t_plc_mx)
     check("Cổng COM: None không mở cổng, chặn hai thiết bị trùng cổng", t_com_none_conflict)
     check("Kiểm tra thiết bị ở thẻ Cài đặt: nhận ra cân / đầu đọc / sai cổng", t_probe)
     check("Tự dò cổng COM theo tên Windows (trạm ST02), thiếu / trùng -> None", t_portmap)
@@ -397,6 +397,45 @@ def t_plc_mx():
         self._ct = True
         return FakeCt(), "control giả comtypes"
 
+    # Nút vật lý: M20 START / M22 STOP / M21 ĐỊNH DANH, kích ở sườn lên; bit đang 1 lúc nối không kích.
+    class FakeBtn(FakeCt):
+        bits = {"M20": 1, "M21": 0, "M22": 0}
+
+        def GetDevice(self, dev):
+            return (FakeBtn.bits.get(dev, 0), 0)
+
+    def create_btn(self):
+        self._ct = True
+        return FakeBtn(), "control giả nút"
+
+    pressed = []
+    FakeAct.opens = 1
+    plc_mx.MxPlc._create = create_btn
+    p = plc_mx.MxPlc({"enabled": True, "station_number": 0, "keepalive_s": 5,
+                      "buttons": {"start": "M20", "stop": "M22", "identify": "M21"},
+                      "button_poll_ms": 50})
+    p.on_button = pressed.append
+    try:
+        p.start()
+        wait(lambda: p.connected, 3, "PLC nối (nút)")
+        time.sleep(0.3)
+        assert pressed == [], "M20 đang 1 lúc nối không được tự Bắt đầu: %s" % pressed
+        FakeBtn.bits["M20"] = 0
+        time.sleep(0.2)
+        FakeBtn.bits["M20"] = 1
+        wait(lambda: pressed == ["start"], 2, "nhấn START (M20)")
+        time.sleep(0.3)
+        assert pressed == ["start"], "giữ nút không được kích lặp: %s" % pressed
+        FakeBtn.bits.update(M20=0, M22=1)
+        wait(lambda: pressed == ["start", "stop"], 2, "nhấn STOP (M22)")
+        FakeBtn.bits.update(M22=0, M21=1)
+        wait(lambda: pressed == ["start", "stop", "identify"], 2, "nhấn ĐỊNH DANH (M21)")
+    finally:
+        p.stop()
+        plc_mx.MxPlc._create = real
+    p = plc_mx.MxPlc({"enabled": True, "buttons": {"start": "", "stop": "", "identify": ""}})
+    assert p._buttons == {}, "bit để trống = không dùng nút"
+
     FakeAct.opens, FakeAct.dead = 1, False
     plc_mx.MxPlc._create = create_ct
     p = plc_mx.MxPlc({"enabled": True, "station_number": 0, "keepalive_s": 0.2})
@@ -575,7 +614,8 @@ def e2e_tests(env):
         remove()
         stop()
         last = http(SIMU + "/sim/state")[1]["labels"][-1]
-        assert (last["order"], last["spec"], last["mfg_date"]) ==             ("VAS-091026-3", "6 chiếc", "09/10/2026"), last
+        want = ("VAS-091026-3", "6 chiếc", "09/10/2026")
+        assert (last["order"], last["spec"], last["mfg_date"]) == want, last
         assert last["received_code"] == cl[0] and last["item_name"].startswith("Bóng Led trụ"), last
         with urllib.request.urlopen(APP + "/labels?pallet=LPN03020", timeout=5) as g:
             page = g.read().decode("utf-8")
@@ -612,7 +652,8 @@ def e2e_tests(env):
         assert (c["pass"], c["fail"]) == (6, 0), c
         info = http(APP + "/api/info")[1]["db"]
         assert info["pallets"] == 0 and info["parcels"] == 0, "bảng đang làm phải rỗng: %s" % info
-        assert (info["pallets_his"] - db0["pallets_his"], info["parcels_his"] - db0["parcels_his"])             == (2, 6), info
+        grew = (info["pallets_his"] - db0["pallets_his"], info["parcels_his"] - db0["parcels_his"])
+        assert grew == (2, 6), info
 
     def job_done():
         j = state()["job"]
@@ -799,6 +840,31 @@ def e2e_tests(env):
         assert (last["type"], last["code"]) == ("carton", done[0]), last
         assert state()["carton"][0] == 1, "in lại không được đổi tiến độ"
 
+    def t_plc_buttons():
+        def press(name):
+            assert http(SIMU + "/sim/plc_button", {"name": name, "hold_ms": 400})[1]["ok"]
+            time.sleep(0.6)                                  # nút nhả rồi mới nhấn nút khác
+
+        order(1, 1)
+        wait(lambda: state()["running"], 10, "lệnh mới tự Bắt đầu")
+        press("stop")
+        wait(lambda: not state()["running"], 10, "nút STOP (M22) dừng trạm")
+        press("identify")
+        wait(lambda: state()["message"] == "CHƯA ĐỦ SỐ LƯỢNG HÀNG!", 5, "ĐỊNH DANH khi chưa đủ thùng")
+        press("start")
+        wait(lambda: state()["running"], 10, "nút START (M20) chạy trạm")
+        sent = len(http(SIMU + "/sim/state")[1]["received"])
+        carton_ok(1)
+        wait(lambda: state()["message"].startswith("ĐÃ HOÀN THÀNH PALLET"), 30, "chờ ĐỊNH DANH")
+        press("identify")
+        wait(lambda: not state()["has_order"], 15, "nút ĐỊNH DANH (M21) gửi pallet")
+        assert len(http(SIMU + "/sim/state")[1]["received"]) == sent + 1
+        wait(lambda: not state()["running"], 15, "tự STOP khi hết lệnh")
+        press("start")
+        wait(lambda: "KHÔNG CÓ LỆNH SẢN XUẤT" in state()["message"], 5, "START khi không có lệnh")
+        assert not state()["running"]
+        http(APP + "/api/counter/reset", {})
+
     def t_server_retry():
         start()
         sim_set(server_mode="error")
@@ -934,6 +1000,7 @@ def e2e_tests(env):
     check("Mất tín hiệu cân tự hồi phục; đầu đọc chờ tới khi có mã; Dừng không treo",
           t_scale_lost_and_stop)
     check("Server lỗi: giữ pallet, tự gửi lại tới khi nhận", t_server_retry)
+    check("Nút vật lý trên tủ (PLC): START / STOP / ĐỊNH DANH", t_plc_buttons)
     check("Lệnh gửi lặp không nhân đôi; cancelTask hủy lệnh; confirm_product", t_cancel_and_duplicate)
     check("Mất điện giữa lệnh: khởi động lại còn nguyên tiến độ", t_power_loss)
     check("HYBRID: thiết bị thật + WCS/RCS mô phỏng", t_hybrid)

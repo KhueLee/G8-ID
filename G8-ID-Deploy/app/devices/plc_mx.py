@@ -20,10 +20,15 @@ chỉ có interface vtable IActUtlType64 khai báo trong thư viện kiểu nhú
 (lData, mã lỗi), các hàm khác trả thẳng mã lỗi.
 
 Đèn tháp (CPLC.SetTrafficLightByM): M0 = đỏ, M1 = xanh, M2 = vàng, M10 = tắt.
+Nút vật lý (TForm.timerPLCButtonScan_Tick, bản 2.4.1): M20 = START, M22 = STOP, M21 = ĐỊNH DANH,
+đọc mỗi 200 ms trong luồng "plc", kích ở sườn lên rồi gọi on_button(tên nút). PLC tự bật / tắt
+bit theo nút; phần mềm chỉ đọc, không ghi trả.
 """
 import logging
 import threading
 import time
+
+from . import PLC_BUTTONS, ButtonEdges
 
 log = logging.getLogger("device.plc")
 
@@ -106,6 +111,11 @@ class MxPlc:
         self._ct = False                        # control tạo bằng comtypes (không phải pywin32)
         self._error = "chưa kết nối" if cfg.get("enabled", True) else "không dùng"
         self._keepalive = float(cfg.get("keepalive_s", 5) or 0)
+        self.on_button = None                    # engine gán: on_button("start" | "stop" | "identify")
+        self._buttons = {k: str(v).strip() for k, v in (cfg.get("buttons", PLC_BUTTONS) or {}).items()
+                         if str(v or "").strip()}
+        self._poll = max(0.05, float(cfg.get("button_poll_ms", 200) or 200) / 1000.0)
+        self._edges = ButtonEdges()
 
     def start(self):
         if not self.cfg.get("enabled", True):
@@ -196,29 +206,62 @@ class MxPlc:
         for dev, val in (("M10", False), ("M0", idx == 0), ("M1", idx == 1), ("M2", idx == 2)):
             self._set(plc, dev, val)
 
+    def _get(self, plc, dev):
+        """GetDevice một bit, trả 0/1. comtypes trả (lData, mã lỗi); pywin32 trả (mã lỗi, lData)."""
+        if self._ct:
+            res = plc.GetDevice(dev)
+            val, rc = (res[0], res[-1]) if isinstance(res, (tuple, list)) else (0, res)
+        else:
+            rc, val = _rc(plc.GetDevice(dev, 0))
+        if int(rc) != 0:
+            raise MxError("GetDevice " + dev, int(rc))
+        return int(val or 0) & 1
+
+    @staticmethod
+    def _call_shape(e):
+        hr = getattr(e, "hresult", None)
+        return isinstance(e, TypeError) or (hr is not None and hr & 0xFFFFFFFF in _CALL_SHAPE_HRESULTS)
+
     def _probe(self, plc):
         """Đọc thử M10 để biết đường truyền còn sống (rút cáp PLC thì chỉ báo PLC phải đỏ)."""
         try:
-            if self._ct:
-                res = plc.GetDevice("M10")       # comtypes: (lData, mã lỗi)
-                rc = int(res[-1] if isinstance(res, (tuple, list)) else res)
-            else:
-                rc, _ = _rc(plc.GetDevice("M10", 0))
+            self._get(plc, "M10")
+        except MxError:
+            raise
         except Exception as e:
-            hr = getattr(e, "hresult", None)
-            if isinstance(e, TypeError) or (hr is not None and hr & 0xFFFFFFFF in _CALL_SHAPE_HRESULTS):
+            if self._call_shape(e):
                 self._keepalive = 0
                 log.warning("PLC: không gọi được GetDevice kiểu này (%s) - tắt dò kết nối định kỳ, "
                             "đèn tháp vẫn hoạt động", e)
                 return
             raise
-        if rc != 0:
-            raise MxError("GetDevice M10", rc)
+
+    def _scan(self, plc):
+        """Đọc các bit nút, nút vừa nhấn (sườn lên) -> on_button. Đọc được cũng là dò kết nối."""
+        try:
+            levels = {name: self._get(plc, dev) == 1 for name, dev in self._buttons.items()}
+        except MxError:
+            raise
+        except Exception as e:
+            if self._call_shape(e):
+                self._buttons = {}
+                log.warning("PLC: không gọi được GetDevice kiểu này (%s) - tắt đọc nút vật lý, "
+                            "đèn tháp vẫn hoạt động", e)
+                return
+            raise
+        for name in self._edges.feed(levels):
+            log.info("Nhấn nút %s từ PLC (%s)", name.upper(), self._buttons[name])
+            cb = self.on_button
+            if cb is not None:
+                try:
+                    cb(name)
+                except Exception:
+                    log.exception("Lỗi xử lý nút %s từ PLC", name)
 
     def _run(self):
         import pythoncom
         pythoncom.CoInitialize()                 # STA, theo mục 11.1 của sổ tay
-        plc, backoff, last_probe = None, 3, 0.0
+        plc, backoff, last_probe, last_scan = None, 3, 0.0, 0.0
         try:
             while not self._stop.is_set():
                 if plc is None:
@@ -226,8 +269,12 @@ class MxPlc:
                         plc, self._via = self._open()
                         self._ok, self._error, self._sent, backoff = True, "", None, 3
                         last_probe = time.time()
-                        log.info("Kết nối PLC OK: %s, Logical Station %s", self._via,
-                                 self.cfg.get("station_number", 0))
+                        self._edges.reset()          # nối lại: lần đọc đầu chỉ ghi nhận mức nút
+                        log.info("Kết nối PLC OK: %s, Logical Station %s%s", self._via,
+                                 self.cfg.get("station_number", 0),
+                                 ", nút " + ", ".join("%s=%s" % (k.upper(), v)
+                                                      for k, v in self._buttons.items())
+                                 if self._buttons else "")
                     except Exception as e:
                         plc, self._ok, self._error = None, False, str(e)
                         log.warning("PLC: %s - thử lại sau %d s", e, backoff)
@@ -241,9 +288,13 @@ class MxPlc:
                         self._sent = want
                         last_probe = time.time()
                         log.info("Đèn tháp -> %s", want)
-                    elif self._keepalive and time.time() - last_probe >= self._keepalive:
+                    elif (self._keepalive and not self._buttons
+                          and time.time() - last_probe >= self._keepalive):
                         self._probe(plc)
                         last_probe = time.time()
+                    if self._buttons and time.time() - last_scan >= self._poll:
+                        self._scan(plc)
+                        last_scan = time.time()
                 except Exception as e:
                     self._ok, self._error = False, str(e)
                     log.warning("PLC: %s - kết nối lại", e)
@@ -253,7 +304,7 @@ class MxPlc:
                         pass
                     plc = None
                     continue
-                self._wake.wait(1.0)
+                self._wake.wait(self._poll if self._buttons else 1.0)
                 self._wake.clear()
         finally:
             if plc is not None:

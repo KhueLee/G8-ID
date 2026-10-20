@@ -1,6 +1,6 @@
 # G8 ID – Docking protocol (giao tiếp trạm định danh ↔ WMS / WCS / RCS)
 
-Phiên bản phần mềm trạm: **2.4.0**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
+Phiên bản phần mềm trạm: **2.4.1**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
 (`G8-ID-Deploy/app/webui.py`, `app/engine.py`). Mục 8 liệt kê các điểm cần đối tác xác nhận.
 
 ## 1. Tổng quan

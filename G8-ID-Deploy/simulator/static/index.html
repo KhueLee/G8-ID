@@ -56,6 +56,9 @@ textarea { width: 100%; height: 90px; background: #141925; color: #fff; border: 
     <h3>PLC / đèn tháp</h3>
     <span class="lamp red" id="l-red"></span><span class="lamp yellow" id="l-yellow"></span><span class="lamp green" id="l-green"></span> <b id="light">off</b><br>
     <label><input type="checkbox" id="plc_online" onchange="setv('plc_online', this.checked)" style="width:auto"> PLC đang nối</label>
+    <div>Nút trên tủ: <button onclick="post('/sim/plc_button', { name: 'start' })">START (M20)</button>
+      <button onclick="post('/sim/plc_button', { name: 'stop' })">STOP (M22)</button>
+      <button onclick="post('/sim/plc_button', { name: 'identify' })">ĐỊNH DANH (M21)</button></div>
   </div>
   <div class="card">
     <h3>Hệ thống gửi lệnh (WMS / WCS)</h3>

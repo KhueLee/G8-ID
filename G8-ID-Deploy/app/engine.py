@@ -112,6 +112,7 @@ class Engine:
         self.cfg = config.get()
         self.lock = threading.RLock()
         self._send_lock = threading.Lock()
+        self._btn_lock = threading.Lock()   # lần nhấn nút PLC trước chưa xong thì bỏ qua lần sau
         self.mode = self._load_mode()
         self.settings = self._load_settings()
         self.db = db.data_db(self.manual)
@@ -256,6 +257,47 @@ class Engine:
                    pallet_id=p["pallet_id"], from_seq=seq)
         return self.mfg_info()
 
+    # ------------------------------------------------------------------ nút vật lý trên PLC
+    # Như TForm.timerPLCButtonScan_Tick của VTP_Induction.exe: M20 = START (DoStart), M22 = STOP
+    # (DoStop), M21 = ĐỊNH DANH (DoSendPalletDoneOnce). Driver PLC quét 200 ms, bắt sườn lên rồi
+    # gọi _plc_button; làm đúng việc của nút trên màn hình, lỗi hiện ở dải thông báo (chữ đỏ).
+    PLC_BUTTON_NAMES = {"start": "START", "stop": "STOP", "identify": "ĐỊNH DANH"}
+
+    def _plc_button(self, name):
+        """Gọi từ luồng PLC: xử lý ở luồng riêng để PLC vẫn quét nút / đặt đèn tháp."""
+        if name not in self.PLC_BUTTON_NAMES:
+            return
+        if not self._btn_lock.acquire(blocking=False):
+            log.info("Nhấn nút %s từ PLC khi lần nhấn trước chưa xong - bỏ qua",
+                     self.PLC_BUTTON_NAMES[name])
+            return
+        threading.Thread(target=self._do_plc_button, args=(name,), name="plc-button",
+                         daemon=True).start()
+
+    def _do_plc_button(self, name):
+        label = self.PLC_BUTTON_NAMES[name]
+        try:
+            log.info("Nhấn nút %s từ PLC", label)
+            self.event("plc_button", button=name)
+            if name == "start":
+                r = self.start(confirm_no_light=True)   # nút đến từ PLC thì PLC đang nối
+            elif name == "stop":
+                r = self.stop()
+            elif self.db.pallets.find_one({"status": "AWAIT_SEND"}, {"_id": 1}) is None \
+                    and self._front_pallet() is not None:
+                r = {"ok": False, "error": "CHƯA ĐỦ SỐ LƯỢNG HÀNG!"}
+            else:
+                r = self.identify()
+            if not r.get("ok"):
+                text = r.get("error") or r.get("title") or "KHÔNG THỰC HIỆN ĐƯỢC"
+                log.warning("Nút %s từ PLC: %s", label, text)
+                self._msg(text, RED)
+            self._dirty = True
+        except Exception:
+            log.exception("Lỗi xử lý nút %s từ PLC", label)
+        finally:
+            self._btn_lock.release()
+
     # ------------------------------------------------------------------ tiện ích
     def event(self, kind, **data):
         try:
@@ -270,6 +312,7 @@ class Engine:
         self.port_notes = {} if self.sim_devices else portmap.apply(self.cfg)
         self.dev = devices.build(self.cfg, self.sim_devices)
         self.dev.notes = self.port_notes
+        self.dev.plc.on_button = self._plc_button
 
     PORT_MSG = "CHƯA TÌM THẤY CỔNG COM: "
 

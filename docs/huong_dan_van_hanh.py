@@ -190,7 +190,8 @@ def build():
     s += header_strip()
     s += table([
         ["Chỉ báo", "Là gì"],
-        ["PLC", "Bộ điều khiển đèn tháp. Lỗi PLC <b>không chặn</b> sản xuất, chỉ mất đèn tháp."],
+        ["PLC", "Bộ điều khiển đèn tháp và 3 nút trên tủ (START / STOP / ĐỊNH DANH). Lỗi PLC "
+                "<b>không chặn</b> sản xuất, chỉ mất đèn tháp và nút trên tủ – dùng nút trên màn hình."],
         ["PRINTER", "Máy in tem Godex."],
         ["SCALE", "Cân điện tử."],
         ["BARCODE", "Đầu đọc mã vạch (đọc lại tem vừa in)."],
@@ -210,7 +211,8 @@ def build():
                      "<b>Đạt</b> / <b>Sai</b> (nút <i>Đặt lại bộ đếm</i> để về 0)."],
         ["Dải dưới cùng", "VỊ TRÍ 01–03 (ô nhấp nháy = nơi đặt pallet); <b>dòng thông báo</b> chữ "
                           "lớn (có mũi tên) – luôn đọc dòng này để biết máy đang chờ gì; nút "
-                          "<b>Bắt đầu</b> và <b>Dừng</b>."],
+                          "<b>Bắt đầu</b> và <b>Dừng</b> (nút <b>START</b> / <b>STOP</b> trên tủ "
+                          "làm đúng như vậy)."],
         ["Các thẻ", "<b>Trang chủ</b> · <b>Cài đặt</b> (cần mật khẩu, mặc định 1234) · "
                     "<b>Thông số</b> (danh sách lệnh, in lại tem – mục A11) · "
                     "<b>Lịch sử Log</b> (nhật ký chạy) · <b>Hướng dẫn</b> (mở tài liệu này)."],
@@ -232,8 +234,9 @@ def build():
         "Thùng đạt: ô lớn <font color='#1e8a1e'><b>OK</b></font>, đèn xanh. Lấy thùng ra khỏi cân; "
         "khi thấy <b>SẴN SÀNG CHO SẢN PHẨM MỚI</b> thì đặt thùng tiếp theo.",
         "Đủ thùng của pallet: thông báo <b>ĐÃ HOÀN THÀNH PALLET - HÃY BẤM NÚT ĐỊNH DANH</b> → bấm nút "
-        "<b>Định danh</b> trên thanh đầu – pallet được gửi lên server ngay, không hỏi xác nhận "
-        "(nút chỉ bấm được khi pallet đã đủ thùng).",
+        "<b>Định danh</b> trên thanh đầu (hoặc nút <b>ĐỊNH DANH</b> trên tủ) – pallet được gửi lên "
+        "server ngay, không hỏi xác nhận (nút chỉ bấm được khi pallet đã đủ thùng; bấm nút trên tủ "
+        "khi chưa đủ thì dòng thông báo báo <b>CHƯA ĐỦ SỐ LƯỢNG HÀNG!</b>).",
         "Thấy <b>PALLET OK – TIẾP TỤC SẢN XUẤT</b> → làm pallet tiếp theo. Hết lệnh: "
         "<b>ĐÃ HOÀN TẤT LỆNH SẢN XUẤT</b>, trạm tự về STOP.",
     ])
@@ -457,7 +460,8 @@ def build():
          "(máy chính đứng chờ ở ĐANG ĐỌC MÃ VẠCH).",
          "Có", "Mờ"],
         ["Máy in tem", "Xem các tem \u201cđã in\u201d; giả lập in lỗi.", "Có", "Mờ"],
-        ["PLC / đèn tháp", "Xem màu đèn phần mềm đang bật.", "Có", "Mờ"],
+        ["PLC / đèn tháp", "Xem màu đèn phần mềm đang bật; 3 nút giả lập nút trên tủ "
+         "(START / STOP / ĐỊNH DANH).", "Có", "Mờ"],
         ["Hệ thống gửi lệnh (WMS / WCS)",
          "<b>Gửi lệnh sản xuất</b> (số pallet, số thùng/pallet, Weight_ref); hủy lệnh theo "
          "Task_ID; gửi bản tin JSON tùy ý.", "Có", "Có"],

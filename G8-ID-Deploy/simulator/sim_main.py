@@ -35,6 +35,7 @@ S = {
     "last_parcel": "",
     "printer_online": True, "printer_fail": False, "labels": [],
     "plc_online": True, "light": "off",
+    "plc_buttons": {"start": False, "stop": False, "identify": False},   # mức bit M20 / M22 / M21
     "server_mode": "ok", "received": [],
     "auto": False, "auto_identify": True, "carton_weight": 300,
     "app": "?", "app_running": False, "events": [],
@@ -134,6 +135,28 @@ def dev_printer():
     return jsonify(ok=True)
 
 
+@app.get("/dev/plc/buttons")
+def dev_plc_buttons():
+    return jsonify(plc=S["plc_online"], buttons=S["plc_buttons"])
+
+
+@app.post("/sim/plc_button")
+def sim_plc_button():
+    """Nhấn nút vật lý trên tủ: bit lên 1 trong hold_ms (mặc định 600 ms) rồi về 0, như nút nhả."""
+    b = request.get_json(silent=True) or {}
+    name = str(b.get("name", ""))
+    if name not in S["plc_buttons"]:
+        return jsonify(ok=False, error="nút không hợp lệ: " + name), 400
+    hold = max(0.25, float(b.get("hold_ms", 600)) / 1000.0)
+    S["plc_buttons"][name] = True
+    note("[SIM PLC] Nhấn nút %s" % name.upper())
+
+    def release():
+        S["plc_buttons"][name] = False
+    threading.Timer(hold, release).start()
+    return jsonify(ok=True)
+
+
 @app.post("/dev/plc/light")
 def dev_plc():
     color = (request.get_json(silent=True) or {}).get("color", "off")
@@ -170,7 +193,7 @@ def sim_state():
 def sim_set():
     b = request.get_json(silent=True) or {}
     for k, v in b.items():
-        if k in S and k not in ("labels", "received", "events", "app", "app_running"):
+        if k in S and k not in ("labels", "received", "events", "app", "app_running", "plc_buttons"):
             S[k] = type(S[k])(v) if not isinstance(S[k], bool) else bool(v)
             note("Đặt %s = %s" % (k, S[k]))
     return jsonify(ok=True)

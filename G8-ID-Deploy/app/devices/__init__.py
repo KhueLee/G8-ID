@@ -3,6 +3,27 @@ import logging
 
 log = logging.getLogger("device")
 
+# Nút vật lý trên PLC, như TForm.timerPLCButtonScan_Tick của VTP_Induction.exe (quét 200 ms).
+PLC_BUTTONS = {"start": "M20", "stop": "M22", "identify": "M21"}
+
+
+class ButtonEdges:
+    """Bắt sườn lên (0 -> 1) của các nút PLC: giữ nút không kích lặp. Lần đọc đầu sau khi nối
+    (hoặc sau reset) chỉ ghi nhận mức hiện tại, không kích - bit đang sẵn 1 không tự Bắt đầu."""
+
+    def __init__(self):
+        self.prev = None
+
+    def reset(self):
+        self.prev = None
+
+    def feed(self, levels):
+        """levels: {tên nút: bool}. Trả danh sách nút vừa được nhấn."""
+        prev, self.prev = self.prev, dict(levels)
+        if prev is None:
+            return []
+        return [n for n, v in levels.items() if v and not prev.get(n)]
+
 
 class DeviceSet:
     def __init__(self, scale, barcode, printer, plc):

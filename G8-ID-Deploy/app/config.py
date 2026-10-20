@@ -6,7 +6,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.environ.get("G8ID_CONFIG") or os.path.join(BASE_DIR, "config.json")
-VERSION = "2.4.0"
+VERSION = "2.4.1"
 
 DEFAULTS = {
     "station_id": "ST01",
@@ -32,8 +32,12 @@ DEFAULTS = {
         # MX Component: station_number = Logical Station trong Communication Settings Utility;
         # password = remote password của PLC (nếu có); keepalive_s = chu kỳ đọc thử M10 (0 = tắt);
         # com_port = cổng COM đã đặt cho Logical Station, chỉ để thẻ Cài đặt không gán trùng.
+        # buttons = bit nút vật lý trên tủ như bản cũ ("" = không dùng nút đó), đọc mỗi
+        # button_poll_ms; có đọc nút thì không cần đọc thử M10.
         "plc": {"enabled": True, "station_number": 0, "password": "", "keepalive_s": 5,
-                "progid": "", "com_port": "", "auto": True, "detect": "CH340"},
+                "progid": "", "com_port": "", "auto": True, "detect": "CH340",
+                "buttons": {"start": "M20", "stop": "M22", "identify": "M21"},
+                "button_poll_ms": 200},
     },
     "servers": {
         "pallet_done_url": "http://192.168.110.189:8060/identify-service/ids/pallet_identify_done",

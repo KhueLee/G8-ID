@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.0)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.1)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -122,7 +122,7 @@ git stash pop
 | Cân | Cổng *USB Serial Port* (cáp FTDI), 9600 8N1. Quá 2 s không có số → “MẤT TÍN HIỆU CÂN”; quá 10 s → tự đóng/mở lại cổng. |
 | Đầu đọc Honeywell | Cổng *USB Serial Device*, 9600 8N1. Bật quét `16 54 0D`, tắt `16 55 0D`; thời gian chờ đọc mã ở thẻ Cài đặt (mặc định 5000 ms). |
 | Máy in Godex EZ520+ | USB qua `drivers\EZio64.dll`. |
-| PLC Mitsubishi | Cáp *USB-SERIAL CH340*, MX Component 5, đèn tháp M0 đỏ / M1 xanh / M2 vàng / M10 tắt. |
+| PLC Mitsubishi | Cáp *USB-SERIAL CH340*, MX Component 5, đèn tháp M0 đỏ / M1 xanh / M2 vàng / M10 tắt. Nút trên tủ: **M20 START / M22 STOP / M21 ĐỊNH DANH** (đọc mỗi 200 ms). |
 
 **Chọn cổng COM ở thẻ Cài đặt → Thiết bị**
 - **Tự dò** (mặc định): mỗi lần khởi động và mỗi lần *Lưu + kết nối lại*, phần mềm tìm cổng có tên
@@ -160,8 +160,17 @@ Gửi lệnh khác: `tools\scanner_timeout.bat "TRGSTO?."`.
    `Kết nối PLC OK: ActUtlType64 (MX Component 5), Logical Station 0`.
 
 `ActUtlType64` không có IDispatch nên không gọi được bằng `win32com`; driver (`app\devices\plc_mx.py`)
-gọi qua **comtypes** với interface `IActUtlType64`. PLC lỗi không chặn sản xuất, chỉ mất đèn tháp;
-mã lỗi kèm nghĩa tiếng Việt hiện ở chỉ báo PLC và `device-*.log`.
+gọi qua **comtypes** với interface `IActUtlType64`. PLC lỗi không chặn sản xuất, chỉ mất đèn tháp
+và nút trên tủ (vẫn bấm được nút trên màn hình); mã lỗi kèm nghĩa tiếng Việt hiện ở chỉ báo PLC và
+`device-*.log`.
+
+**Nút vật lý trên tủ** (như `timerPLCButtonScan_Tick` của `VTP_Induction.exe`): luồng PLC đọc
+`devices.plc.buttons` = `{"start": "M20", "stop": "M22", "identify": "M21"}` mỗi `button_poll_ms`
+(200 ms). Nút kích **một lần ở sườn lên** (bit 0 → 1, giữ nút không kích lặp); lần đọc đầu sau khi
+nối PLC chỉ ghi nhận mức hiện tại. Mỗi nút làm đúng việc của nút trên màn hình (Bắt đầu / Dừng /
+Định danh); không làm được thì dải thông báo hiện lý do chữ đỏ (vd. `CHƯA ĐỦ SỐ LƯỢNG HÀNG!`,
+`KHÔNG CÓ LỆNH SẢN XUẤT…`). Log: `Nhấn nút START từ PLC`. PLC tự bật / tắt bit theo nút, phần mềm
+chỉ đọc. Trạm nối nút vào bit khác thì sửa `buttons` trong `config.json`; để `""` = bỏ nút đó.
 
 **Cổng CH340 kẹt khi bật máy** – giả thuyết: cân phát dữ liệu liên tục nên Windows nhận nhầm là
 chuột serial. `check_env.bat` báo cổng bị nhận là *Serial Mouse*; `tools\fix_serial_mouse.bat` tắt
@@ -212,8 +221,8 @@ Component rồi mở lại `chay_dinh_danh.bat`.
    tài liệu và mã nguồn) – cần một bản tin thật của WMS để đối chiếu tên trường.
 2. Lệnh có `Pallet_ID` đang có trong danh sách bị bỏ qua nhưng vẫn trả `1000 SUCCESS` cho WMS,
    kể cả khi khác PO / Task – chờ quyết định có trả lỗi hay không.
-3. PLC: đã `Open` / `Close` được ở trạm; bật đèn (`SetDevice`) và dò kết nối (`GetDevice`) chưa
-   xác nhận.
+3. PLC: đã `Open` / `Close` được ở trạm; bật đèn (`SetDevice`), dò kết nối và đọc nút M20 / M21 / M22
+   (`GetDevice`) chưa xác nhận trên PLC thật – địa chỉ nút lấy từ `VTP_Induction.exe`.
 4. `tools\scanner_timeout.bat`: mới thử với cổng COM giả.
 5. Máy in Godex: đã nạp `EZio64.dll` và kết nối; nên dùng *In thử tem* ở thẻ Cài đặt lần đầu.
 6. *In PDF mã hiện tại* (thẻ Thông số) mở trang tem 70x40 mm trong Chrome để in / *Lưu dưới dạng PDF*;
@@ -222,10 +231,11 @@ Component rồi mở lại `chay_dinh_danh.bat`.
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.0 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.1 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|
+| 2.4.1 | **Nút vật lý trên tủ qua PLC** như bản cũ: M20 = START, M22 = STOP, M21 = ĐỊNH DANH, quét 200 ms, kích ở sườn lên (giữ nút không lặp, bit đang 1 lúc nối PLC không tự Bắt đầu). Làm đúng việc của nút trên màn hình; lỗi hiện ở dải thông báo. Địa chỉ bit sửa được ở `devices.plc.buttons`. Công cụ mô phỏng có 3 nút giả lập trong ô PLC. |
 | 2.4.0 | Lệnh WCS: đọc **`GW`** (kg / thùng, vd. `1.637`) đổi ra gam (1637 g) làm khối lượng chuẩn khi cân – trước đây chỉ đọc `Weight_ref` nên lệnh WCS thật luôn cân theo cài đặt trạm (300 g); `Weight_ref` (gam) vẫn nhận và dùng trước `GW`. `Pallet_Current` lấy ở cấp lệnh (đúng bản tin WCS), không có mới tìm trong `info_detail`; hiện ở thẻ Thông số cùng khối lượng chuẩn. Ngày sản xuất: sửa tay được cả khi lệnh đã có thùng đạt – áp dụng từ thùng in tiếp theo trở đi cho mọi pallet còn lại của lệnh, tem đã in giữ ngày cũ (lệnh làm qua nhiều ngày). Tem: dòng **"Mã lệnh"** in `PO_Name` (vd. `VAS-091026-3`, thiếu thì `PO_ID`) thay cho `WH_Code`; nhãn tiếng Việt có dấu ("Quy cách : 6 chiếc", "Mã lệnh", "NSX"), dữ liệu từ lệnh in nguyên như WCS gửi. Trang *In PDF mã hiện tại* in giống vậy. |
 | 2.3.3 | Tem: dòng "Ma Pallet" đổi thành **"Quy cach : N chiec"** – số chiếc / thùng lấy theo `Inner_Carton` của lệnh; lệnh không gửi `Inner_Carton` thì lấy `Qty / Ctn` (chia hết), không có cả hai thì để trống. Trang *In PDF mã hiện tại* in giống vậy. |
 | 2.3.2 | Tem: logo G8HOME mới (`drivers/G8_Label.bmp`, đen trắng 100x55 điểm, nằm trong khu logo cũ cạnh số thứ tự thùng). Trang *In PDF mã hiện tại* dùng cùng ảnh logo thay cho chữ "G8HOME". |

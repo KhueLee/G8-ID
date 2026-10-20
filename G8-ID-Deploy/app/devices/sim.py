@@ -5,6 +5,8 @@ import threading
 import time
 import urllib.request
 
+from . import ButtonEdges
+
 log = logging.getLogger("device.sim")
 
 
@@ -153,6 +155,30 @@ class SimPlc(_Polled):
     def __init__(self, base):
         super().__init__(base)
         self._want = "off"
+        self.on_button = None                    # như MxPlc: engine gán on_button(tên nút)
+
+    def _run(self):
+        """Như PLC thật: đọc mức các nút mỗi 200 ms, nút vừa nhấn (sườn lên) -> on_button."""
+        edges = ButtonEdges()
+        while not self._stop.is_set():
+            try:
+                r = _call(self.base, "/dev/plc/buttons", timeout=1.0)
+                self._ok = bool(r.get("plc", True))
+                self._error = "" if self._ok else "thiết bị mô phỏng đang tắt"
+                if self._ok:
+                    for name in edges.feed({k: bool(v) for k, v in (r.get("buttons") or {}).items()}):
+                        log.info("Nhấn nút %s từ PLC (mô phỏng)", name.upper())
+                        if self.on_button is not None:
+                            try:
+                                self.on_button(name)
+                            except Exception:
+                                log.exception("Lỗi xử lý nút %s từ PLC", name)
+                else:
+                    edges.reset()
+            except Exception as e:
+                self._fail(e)
+                edges.reset()
+            self._stop.wait(0.2)
 
     def set_light(self, color):
         if color == self._want and self._ok:
