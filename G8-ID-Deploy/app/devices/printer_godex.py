@@ -3,7 +3,8 @@
 Tem thùng 70x40 mm (560x320 điểm, 8 điểm/mm), bố cục từ bản 2.3.0:
   khu 1 (trên mã QR): giờ in tem (không in ngày in - ngày trên tem chỉ là NSX)
   cột trái: logo, số thứ tự thùng, tên sản phẩm (chữ đậm, tối đa 3 dòng), quy cách (số chiếc /
-    thùng, thay dòng mã pallet từ bản 2.3.3), mã lệnh, NSX
+    thùng, thay dòng mã pallet từ bản 2.3.3), mã lệnh (PO_Name WCS gửi, từ bản 2.4.0), NSX.
+    Nhãn các dòng in tiếng Việt có dấu (từ bản 2.4.0); dữ liệu từ lệnh in nguyên như WCS gửi.
   mã QR và khu 2 (dải dưới cùng), từ bản 2.3.1: nguyên phần tử Carton_List WMS gửi
     (vd. TRU_V01_10W_AT|||||||48|0|G8HOME...||001||||||||01). Đọc lại tem thì phần mềm mới tách
     mã định danh (phần thứ 10) ra để so khớp.
@@ -225,7 +226,7 @@ class GodexPrinter:
         data = text.encode("utf-16-le")
         dll.ecTextOutRW(x, y, h, b"Arial", data, 0, weight, 0, len(text))
 
-    def print_carton(self, parcel_code, item_name, pallet_code, wh_code, mfg_date="", seq=None,
+    def print_carton(self, parcel_code, item_name, pallet_code, order_code, mfg_date="", seq=None,
                      received_code="", spec=""):
         with self._lock:
             if not self._open:
@@ -244,8 +245,8 @@ class GodexPrinter:
                 h, name = wrap_name(item_name)
                 for i, line in enumerate(name):
                     self._text(dll, LEFT_X, NAME_Y + i * (h + NAME_LEAD), h, line, FW_BOLD)
-                for i, line in enumerate(("Quy cach  : " + str(spec),
-                                          "Ma Lenh   : " + str(wh_code),
+                for i, line in enumerate(("Quy cách : " + str(spec),
+                                          "Mã lệnh  : " + str(order_code),
                                           "NSX       : " + str(mfg_date))):
                     self._text(dll, LEFT_X, LINE_Y + i * LINE_GAP, LINE_H, line, FW_SEMIBOLD)
                 full = str(received_code or parcel_code)

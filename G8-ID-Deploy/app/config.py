@@ -6,7 +6,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.environ.get("G8ID_CONFIG") or os.path.join(BASE_DIR, "config.json")
-VERSION = "2.3.3"
+VERSION = "2.4.0"
 
 DEFAULTS = {
     "station_id": "ST01",
@@ -44,7 +44,7 @@ DEFAULTS = {
 
 # Thông số vận hành sửa từ thẻ Cài đặt (lưu trong MongoDB, collection settings).
 SETTING_DEFAULTS = {
-    "scale_value": 300,          # khối lượng chuẩn (g) - dùng khi lệnh không gửi Weight_ref
+    "scale_value": 300,          # khối lượng chuẩn (g) - dùng khi lệnh không gửi Weight_ref / GW
     "scale_error": 100,          # sai số cho phép (g)
     "time_scale": 2,             # thời gian cân ổn định (s)
     "positions": ["S01.120.01", "S01.121.01", "S01.122.01",

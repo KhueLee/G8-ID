@@ -304,7 +304,7 @@ const kv = (id, rows) => $(id).innerHTML = rows.map(([k, v]) => `<tr><td>${esc(k
 async function loadInfo() {
   const r = await api('/api/info'), s = r.settings;
   kv('i-station', [['Mã trạm', r.station], ['Bàn định danh số', r.desk_no], ['Phiên bản', r.version], ['Chế độ', r.mode], ['Đã chạy', r.uptime_min + ' phút'],
-    ['Khối lượng chuẩn', s.scale_value + ' g (dùng khi lệnh không gửi Weight_ref)'], ['Sai số', '± ' + s.scale_error + ' g'], ['Thời gian cân', s.time_scale + ' s'],
+    ['Khối lượng chuẩn', s.scale_value + ' g (dùng khi lệnh không gửi GW / Weight_ref)'], ['Sai số', '± ' + s.scale_error + ' g'], ['Thời gian cân', s.time_scale + ' s'],
     ['Gửi pallet', s.pallet_done_trigger === 'auto' ? 'Tự động' : 'Bấm nút ĐỊNH DANH'], ['Vị trí sàn', s.positions.join(', ')]]);
   kv('i-dev', [...['plc', 'printer', 'scale', 'barcode'].map(k => [k.toUpperCase(), (r.devices[k].ok ? 'ĐÃ KẾT NỐI' : 'MẤT KẾT NỐI') + ' — ' + r.devices[k].detail]),
     ['Cổng nhận lệnh', r.order_port + '  (/ids/orderTask/, /ids/cancelTask/, /ids/confirm_product/)'], ['Server nhận pallet', r.pallet_done_url],
@@ -328,8 +328,9 @@ const fromIso = d => d ? d.split('-').reverse().join('/') : '';
 let mfgLocked = true;
 function mfgUi() { $('mf-date').disabled = mfgLocked || !$('mf-on').checked; }
 $('mf-on').onchange = mfgUi;
+const mfgFrom = m => m.next_seq ? `pallet ${m.pallet_id}, thùng STT ${m.next_seq}` : `pallet kế tiếp của lệnh`;
 function showMfg(m) {
-  mfgLocked = !m.has_order || m.locked;
+  mfgLocked = !m.has_order;
   $('mf-po').textContent = m.has_order ? m.po : 'Chưa có lệnh';
   $('mf-order').textContent = m.has_order ? (m.order_date || '(lệnh không gửi ngày)') : '-';
   $('mf-eff').textContent = m.has_order ? (m.effective || '-') + (m.manual ? '  (sửa tay)' : '  (theo lệnh)') : '-';
@@ -337,25 +338,24 @@ function showMfg(m) {
   $('mf-date').value = toIso(m.manual ? m.date : m.order_date) || new Date().toISOString().slice(0, 10);
   const h = $('mf-hint');
   h.textContent = !m.has_order ? 'Chưa có lệnh sản xuất trên bàn: ngày sản xuất chỉ sửa được cho lệnh đã về bàn.'
-    : m.locked ? 'Lệnh này đã định danh thùng / pallet: không sửa được ngày sản xuất nữa.'
-    : 'Tích “Sửa ngày sản xuất” rồi chọn ngày để in lên tem. Bỏ tích = in theo lệnh. Lệnh mới về bàn luôn lấy ngày theo lệnh.';
-  h.classList.toggle('bad', !!(m.has_order && m.locked));
+    : `Tích “Sửa ngày sản xuất” rồi chọn ngày để in lên tem. Ngày mới áp dụng từ ${mfgFrom(m)} trở đi, tem đã in giữ ngày cũ. Bỏ tích = in theo lệnh. Lệnh mới về bàn luôn lấy ngày theo lệnh.`;
+  h.classList.remove('bad');
   mfgUi();
 }
 async function loadMfg() { const r = await api('/api/mfg'); if (r.ok) showMfg(r.mfg); }
 async function saveMfg() {
   const on = $('mf-on').checked, d = fromIso(val('mf-date'));
   if (on && !d) return alertBox('Chọn ngày sản xuất.', 'LỖI');
-  if (!(await confirmBox(on ? `In ngày sản xuất ${d} cho lệnh ${$('mf-po').textContent}?` : 'In ngày sản xuất theo lệnh?', 'Ngày sản xuất', 'Yes', 'No'))) return;
+  if (!(await confirmBox(on ? `In ngày sản xuất ${d} cho lệnh ${$('mf-po').textContent} từ thùng in tiếp theo?` : 'In ngày sản xuất theo lệnh từ thùng in tiếp theo?', 'Ngày sản xuất', 'Yes', 'No'))) return;
   const r = await api('/api/mfg', { enabled: on, date: d });
   if (!r.ok) { await alertBox(r.error, 'LỖI'); return loadMfg(); }
   showMfg(r.mfg);
-  alertBox('Đã lưu. Tem in ra ngày ' + r.mfg.effective + '.');
+  alertBox(`Đã lưu. Tem in ngày ${r.mfg.effective} từ ${mfgFrom(r.mfg)} trở đi.`);
 }
 
 // ---------- thẻ Thông số: bố cục và nút như phần mềm cũ ----------
 const PEND_COLS = [['inner_pallet', 'Inner_Pallet'], ['pallet_id', 'Pallet_ID'], ['item_code', 'Item_Code'], ['item_name', 'Item_Name'], ['po', 'PO_Name'],
-  ['location', 'Location'], ['status', 'Status'], ['cartons', 'Thùng đạt'], ['mfg_date', 'MFG_Date'], ['wh_code', 'WH_Code'], ['line_id', 'Line_ID'], ['po_id', 'PO_ID'], ['created_at', 'CreatedAt']];
+  ['pallet_current', 'Pallet_Current'], ['weight_ref', 'Chuẩn (g)'], ['location', 'Location'], ['status', 'Status'], ['cartons', 'Thùng đạt'], ['mfg_date', 'MFG_Date'], ['wh_code', 'WH_Code'], ['line_id', 'Line_ID'], ['po_id', 'PO_ID'], ['created_at', 'CreatedAt']];
 const DONE_COLS = PEND_COLS.concat([['done_at', 'DoneAt'], ['done_reason', 'DoneReason'], ['ctn', 'Ctn'], ['qty', 'Qty'], ['pcs', 'Pcs']]);
 const PARCEL_COLS = [['stt', 'STT'], ['code', 'Mã định danh'], ['text', 'Trạng thái'], ['mfg_date', 'Mfg_Date'], ['weight', 'Khối lượng (g)'], ['prints', 'Số lần in'], ['done_at', 'Thời gian']];
 let ord = { pending: [], completed: [] }, selPend = '', selDone = null, lastSel = '', parcelsOf = null, ordTimer = null;

@@ -393,10 +393,10 @@ def label_page(data):
         out.append(
             '<div class="tem"><div class="l"><div class="top">%s'
             '<span class="seq">%s</span></div><div class="name">%s</div>'
-            '<div>Quy cach&nbsp;&nbsp; : %s</div><div>Ma Lenh&nbsp;&nbsp; : %s</div><div>NSX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : %s</div></div>'
+            '<div>Quy cách : %s</div><div>Mã lệnh&nbsp; : %s</div><div>NSX&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : %s</div></div>'
             '<div class="r"><div class="stamp">%s</div>%s</div>'
             '<div class="code" style="%s">%s</div></div>'
-            % (logo, r["seq"], e(data["item"]), e(data.get("spec", "")), e(data["wh_code"]),
+            % (logo, r["seq"], e(data["item"]), e(data.get("spec", "")), e(data["order"]),
                e(r["mfg_date"]), stamp, qr, code_style(r["full"]), e(r["full"])))
     return ('<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Tem pallet %s</title>'
             '<style>%s</style></head><body><div class="bar">Pallet <b>%s</b> - %d tem. '

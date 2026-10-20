@@ -80,7 +80,7 @@ def unit_tests():
     from app.devices.scale import parse_weight
     from app.devices.printer_godex import (CHAR_W, CODE_H, CODE_W, LEFT_W, NAME_BOX, QR_BOX,
                                           code_size, name_lines, qr_mul, text_em, wrap_name)
-    from app.engine import field, fmt_date, parse_carton
+    from app.engine import field, fmt_date, order_code, parse_carton, spec_text, std_weight_g
 
     def t_scale():
         cases = {"ST,GS,+  1.234kg": 1234, "  300 g": 300, "US,NT,+0000.50 kg": 500, "0": 0,
@@ -97,6 +97,17 @@ def unit_tests():
         assert field({"PO_ID": 5}, "po_id") == 5
         assert field({"palletID": "P1"}, "Pallet_ID", "palletID") == "P1"
         assert field({}, "x", default=7) == 7
+
+    def t_wcs_fields():
+        assert std_weight_g({"GW": 1.637, "NW": 0.0}, {}) == 1637            # GW kg/thùng -> gam
+        assert std_weight_g({"GW": "0.5"}, {}) == 500
+        assert std_weight_g({"Weight_ref": 300, "GW": 1.637}, {}) == 300     # Weight_ref (gam) trước
+        assert std_weight_g({}, {"Weight_ref": 250}) == 250                  # mặc định cấp lệnh
+        assert std_weight_g({"GW": 0}, {}) == 0 and std_weight_g({"GW": "x"}, {}) == 0
+        assert order_code({"po_name": "VAS-091026-3", "po_id": 190146369}) == "VAS-091026-3"
+        assert order_code({"po_id": 190146369}) == "190146369" and order_code(None) == ""
+        assert spec_text({"inner_carton": 6}) == "6 chiếc"
+        assert spec_text({"ctn": 32, "qty": 192}) == "6 chiếc" and spec_text({}) == ""
 
     def t_mfg_fmt():
         assert fmt_date("2026-09-18") == "18/09/2026"
@@ -127,6 +138,7 @@ def unit_tests():
 
     check("Phân tích bản tin cân (g / kg / rác)", t_scale)
     check("Ngày sản xuất từ lệnh đổi về dd/mm/yyyy", t_mfg_fmt)
+    check("Lệnh WCS: GW (kg) -> khối lượng chuẩn (g), mã lệnh PO_Name, quy cách", t_wcs_fields)
     check("Tem: tên sản phẩm chữ to, chia tối đa 3 dòng", t_label_name)
     check("Tem: QR + dòng cuối là nguyên phần tử Carton_List, vừa khung", t_label_code)
     check("Tách mã thùng từ Carton_List", t_carton)
@@ -535,7 +547,45 @@ def e2e_tests(env):
         s, r = http(APP + "/api/start", {})
         assert not r["ok"] and "KHÔNG CÓ LỆNH SẢN XUẤT" in r["error"], r
 
+    def t_wcs_real_order():
+        # Đúng dạng lệnh WCS thật (log 19/10/2026), rút gọn còn 2 thùng: GW kg/thùng, không có
+        # Weight_ref, Pallet_Current ở cấp lệnh, mã lệnh in trên tem lấy PO_Name.
+        cl = ["TRU_G01_50W_AT|||||||6|0|G8HOME2347843845538600%d||001||||||||01" % i for i in (1, 2)]
+        o = {"Task_ID": "1-190146369__14:38:41.059898", "PO_ID": 190146369,
+             "PO_Name": "VAS-091026-3", "WH_Code": "WH_TB", "Line_ID": "MCSX001",
+             "info_detail": [{"Item_Code": "TRU_G01_50W_AT",
+                              "Item_Name": "Bóng Led trụ nhôm T50,model T50-125/G01 (6c/T hoặc 24c/T)",
+                              "MFG_Date": "09/10/2026", "Pallet_ID": "LPN03020",
+                              "Location": "S02.257.1", "Carton_List": cl, "Ctn": 2, "Qty": 12,
+                              "Pcs": 0, "Inner_Carton": 6, "Inner_Pallet": 2, "NW": 0.0,
+                              "GW": 1.637}],
+             "fromSystem": "IdentifyService", "Pallet_Current": 1}
+        s, r = http(ORDER + "/ids/orderTask/", o)
+        assert (s, r["code"]) == (200, 1000), (s, r)
+        wait(lambda: state()["has_order"], 10, "nạp lệnh WCS")
+        assert state()["pallet"]["weight"].startswith("1637 ±"), state()["pallet"]
+        t = time.strftime("%Y-%m-%d")
+        row = http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]["pending"][0]
+        assert (row["pallet_current"], row["weight_ref"], row["po"]) == (1, 1637, "VAS-091026-3"), row
+        if not state()["running"]:
+            start()
+        wait(lambda: state()["message"].startswith(("CHỜ ĐẶT", "SẴN SÀNG")), 20, "trạm chờ thùng")
+        place(1637)
+        wait(lambda: state()["carton"][0] >= 1, 30, "thùng 1637 g đạt")
+        remove()
+        stop()
+        last = http(SIMU + "/sim/state")[1]["labels"][-1]
+        assert (last["order"], last["spec"], last["mfg_date"]) ==             ("VAS-091026-3", "6 chiếc", "09/10/2026"), last
+        assert last["received_code"] == cl[0] and last["item_name"].startswith("Bóng Led trụ"), last
+        with urllib.request.urlopen(APP + "/labels?pallet=LPN03020", timeout=5) as g:
+            page = g.read().decode("utf-8")
+        assert "Mã lệnh" in page and "VAS-091026-3" in page and "6 chiếc" in page, page[-800:]
+        s, r = http(ORDER + "/ids/cancelTask/", {"Task_ID": o["Task_ID"]})
+        assert s == 200 and not state()["has_order"], (s, r)
+        http(APP + "/api/counter/reset", {})              # bộ đếm ngày về 0 cho các bài sau
+
     def t_full_order():
+        db0 = http(APP + "/api/info")[1]["db"]                # lịch sử có sẵn từ các bài trước
         o = order(2, 3)
         s = state()
         assert s["carton"] == [0, 3] and s["pallets"] == [0, 2] and s["order"] == [0, 6], s["carton"]
@@ -562,7 +612,7 @@ def e2e_tests(env):
         assert (c["pass"], c["fail"]) == (6, 0), c
         info = http(APP + "/api/info")[1]["db"]
         assert info["pallets"] == 0 and info["parcels"] == 0, "bảng đang làm phải rỗng: %s" % info
-        assert info["pallets_his"] == 2 and info["parcels_his"] == 6, info
+        assert (info["pallets_his"] - db0["pallets_his"], info["parcels_his"] - db0["parcels_his"])             == (2, 6), info
 
     def job_done():
         j = state()["job"]
@@ -602,7 +652,7 @@ def e2e_tests(env):
         stop()                                              # lệnh mới tự Bắt đầu
         today = time.strftime("%d/%m/%Y")
         m = http(APP + "/api/mfg")[1]["mfg"]
-        assert m["has_order"] and not m["manual"] and not m["locked"], m
+        assert m["has_order"] and not m["manual"] and m["pallet_id"] == p1 and m["next_seq"] == 1, m
         assert m["order_date"] == m["effective"] == today, m
         r = http(APP + "/api/mfg", {"enabled": True, "date": "31/02/2026"})[1]
         assert not r["ok"] and "không hợp lệ" in r["error"], r
@@ -636,9 +686,14 @@ def e2e_tests(env):
         stop()
         last = http(SIMU + "/sim/state")[1]["labels"][-1]
         assert last["mfg_date"] == "01/02/2026" and "weight" not in last, last
+        # Đã có thùng đạt vẫn sửa được NSX: áp dụng từ thùng in tiếp theo, thùng đã in giữ ngày cũ
+        r = http(APP + "/api/mfg", {"enabled": True, "date": "02/02/2026"})[1]
+        assert r["ok"] and r["mfg"]["effective"] == "02/02/2026" and r["mfg"]["next_seq"] == 2, r
+        rows = http(APP + "/api/orders/parcels?pallet=" + p1)[1]["rows"]
+        assert [x["mfg_date"] for x in rows] == ["01/02/2026", "02/02/2026"], rows
+        assert state()["pallet"]["mfg_date"] == "02/02/2026"
         r = http(APP + "/api/mfg", {"enabled": False})[1]
-        assert not r["ok"] and "không sửa được" in r["error"], r
-        assert http(APP + "/api/mfg")[1]["mfg"]["locked"]
+        assert r["ok"] and not r["mfg"]["manual"] and r["mfg"]["effective"] == today, r
         # Tải mã định danh + In lại mã định danh (chỉ thùng đã đạt)
         ps = http(APP + "/api/orders/parcels?pallet=" + p1)[1]
         assert (ps["done"], ps["total"]) == (1, 2), ps
@@ -871,6 +926,7 @@ def e2e_tests(env):
     check("Khởi động ở MANUAL (bật mongod kèm theo)", t_boot)
     check("Công cụ mô phỏng nối 4 thiết bị", t_sim_start)
     check("Cổng nhận lệnh: 405 / Empty body / Invalid JSON / order_id invalid", t_order_api)
+    check("Lệnh WCS thật: GW -> chuẩn 1637 g, Pallet_Current, tem mã lệnh PO_Name", t_wcs_real_order)
     check("Lệnh 2 pallet x 3 thùng: cân-in-đọc-định danh-lưu lịch sử", t_full_order)
     check("In lại toàn bộ tem pallet từ lịch sử; máy in lỗi giữa chừng", t_reprint_history)
     check("Ngày sản xuất sửa tay + các nút thẻ Thông số như bản cũ", t_mfg_and_orders_tab)

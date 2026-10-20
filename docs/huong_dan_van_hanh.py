@@ -225,7 +225,8 @@ def build():
         "đầu đọc → <b>ĐANG ĐỌC MÃ VẠCH...</b> Số to ở góc trên tem (cạnh logo) là "
         "<b>số thứ tự của thùng trong pallet</b> (1, 2, 3 …), giống cột STT trong danh sách thùng. "
         "Tem gồm: giờ in (trên mã QR, không in ngày in), tên sản phẩm (chữ to, in đậm, tối đa "
-        "3 dòng), mã pallet, mã lệnh, <b>NSX</b> (ngày sản xuất). <b>Mã QR</b> và <b>dải dưới cùng</b> "
+        "3 dòng, in nguyên như lệnh), <b>Quy cách</b> (số chiếc / thùng), <b>Mã lệnh</b> (mã lệnh "
+        "tổng WCS gửi, vd. VAS-091026-3), <b>NSX</b> (ngày sản xuất). <b>Mã QR</b> và <b>dải dưới cùng</b> "
         "đều là <b>nguyên chuỗi thùng WMS gửi xuống</b> (mã SP|…|mã định danh G8HOME…|…) để nhà "
         "máy đọc mã sản phẩm; khi đầu đọc quét tem, phần mềm tách mã định danh ra để so khớp.",
         "Thùng đạt: ô lớn <font color='#1e8a1e'><b>OK</b></font>, đèn xanh. Lấy thùng ra khỏi cân; "
@@ -308,9 +309,9 @@ def build():
     s += table([
         ["Thông số", "Mặc định", "Ý nghĩa"],
         ["Khối lượng chuẩn (g)", "300",
-         "Khối lượng đúng của một thùng. <b>Lệnh từ WCS có Weight_ref thì dùng Weight_ref</b>; "
-         "chỉ khi lệnh không gửi (hoặc gửi 0) mới dùng số này. Dòng <i>Cân nặng</i> ở Trang chủ "
-         "hiện số đang dùng."],
+         "Khối lượng đúng của một thùng. <b>Lệnh từ WCS có khối lượng thùng (GW, tính bằng kg, "
+         "vd. 1.637 = 1637 g) thì dùng khối lượng của lệnh</b>; chỉ khi lệnh không gửi (hoặc gửi 0) "
+         "mới dùng số này. Dòng <i>Cân nặng</i> ở Trang chủ hiện số đang dùng."],
         ["Sai số cho phép (g)", "100",
          "Chỉ cấu hình ở đây (WCS không gửi), áp cho mọi lệnh. Thùng đạt khi khối lượng nằm "
          "trong <i>chuẩn ± sai số</i>."],
@@ -330,17 +331,19 @@ def build():
 
     s += [CondPageBreak(70 * mm), P("Cài đặt vận hành: sửa ngày sản xuất (NSX) in trên tem", h2),
           P("Ô <b>Cài đặt vận hành</b> nằm dưới ô Chế độ chạy. Mặc định tem in <b>NSX theo lệnh</b> "
-            "WMS gửi; mỗi lệnh mới về bàn đều lấy lại NSX theo lệnh.")]
+            "WMS gửi; mỗi lệnh mới về bàn đều lấy lại NSX theo lệnh. Một lệnh có thể làm qua nhiều "
+            "ngày: sang ngày mới thì sửa NSX theo ngày sản xuất thực tế.")]
     s += steps([
         "Bấm <b>■ Dừng</b>, mở thẻ <b>Cài đặt</b>.",
-        "Ô Cài đặt vận hành hiện <i>Lệnh hiện tại</i>, <i>NSX theo lệnh</i> và <i>Đang in trên tem</i>.",
+        "Ô Cài đặt vận hành hiện <i>Lệnh hiện tại</i>, <i>NSX theo lệnh</i> và <i>Đang in trên tem</i>; "
+        "dòng gợi ý cho biết ngày mới áp dụng từ <i>pallet …, thùng STT …</i>.",
         "Tích <b>Sửa ngày sản xuất</b>, chọn ngày → <b>Lưu ngày sản xuất</b> → Yes. Dòng "
-        "<i>Ngày in trên tem</i> ở Trang chủ đổi theo.",
+        "<i>Ngày in trên tem</i> ở Trang chủ đổi theo. Bấm <b>Bắt đầu</b> làm tiếp.",
         "Muốn in lại theo lệnh: bỏ tích → <b>Lưu ngày sản xuất</b>.",
     ])
-    s += box(["Chỉ sửa được khi lệnh <b>chưa định danh thùng / pallet nào</b>. Đã có thùng đạt thì ô "
-              "bị khóa (chữ đỏ) để mọi tem trong một lệnh cùng một NSX. In lại tem dùng đúng NSX đã "
-              "in lần đầu."])
+    s += box(["Sửa được <b>bất cứ lúc nào</b>, kể cả khi lệnh đã có thùng đạt. Ngày mới áp dụng "
+              "<b>từ thùng in tiếp theo trở đi</b> cho mọi pallet còn lại của lệnh; thùng đã in giữ "
+              "NSX cũ. In lại tem dùng đúng NSX đã in lần đầu của thùng đó."])
 
     s += [CondPageBreak(90 * mm), P("A9. Cài đặt thiết bị: số bàn, cổng COM, kiểm tra kết nối", h2),
           P("Thẻ <b>Cài đặt</b> → ô <b>Thiết bị</b>. Chỉ sửa được khi trạm đang <b>STOP</b>. Sửa "

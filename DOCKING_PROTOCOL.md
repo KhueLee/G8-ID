@@ -1,6 +1,6 @@
 # G8 ID – Docking protocol (giao tiếp trạm định danh ↔ WMS / WCS / RCS)
 
-Phiên bản phần mềm trạm: **2.3.3**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
+Phiên bản phần mềm trạm: **2.4.0**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
 (`G8-ID-Deploy/app/webui.py`, `app/engine.py`). Mục 8 liệt kê các điểm cần đối tác xác nhận.
 
 ## 1. Tổng quan
@@ -58,28 +58,38 @@ sau.
 
 `POST http://<IP trạm>:8500/ids/orderTask/`
 
+Bản tin thật WCS gửi (log trạm 19/10/2026 16:00:50, từ 192.168.110.189; `Carton_List` rút gọn
+còn 2 trong 32 phần tử):
+
 ```json
 {
-  "Task_ID": "1-188580023__18:16:23.159836",
-  "PO_ID": 188580023,
-  "PO_Name": "PO-188580023",
-  "WH_Code": "WH01",
-  "Line_ID": "LINE_01",
-  "fromSystem": "WMS",
+  "Task_ID": "1-190146369__14:38:41.059898",
+  "PO_ID": 190146369,
+  "PO_Name": "VAS-091026-3",
+  "WH_Code": "WH_TB",
+  "Line_ID": "MCSX001",
   "info_detail": [
     {
-      "Pallet_ID": "LPN00977",
-      "Location": "S02.135.1",
-      "Item_Code": "SP-A",
-      "Item_Name": "SAN PHAM A",
-      "Carton_List": ["a|b|c|d|e|f|g|h|i|TP0000101|k", "TP0000102"],
-      "Ctn": 60, "Qty": 720, "Pcs": 0, "Inner_Carton": 12, "Inner_Pallet": 60,
-      "Weight_ref": 300,
-      "MFG_Date": "15/10/2026"
+      "Item_Code": "TRU_G01_50W_AT",
+      "Item_Name": "Bóng Led trụ nhôm T50,model T50-125/G01 (6c/T hoặc 24c/T)",
+      "MFG_Date": "09/10/2026",
+      "Pallet_ID": "LPN03020",
+      "Location": "S02.257.1",
+      "Carton_List": ["TRU_G01_50W_AT|||||||6|0|G8HOME23478438455386001||001||||||||01",
+                      "TRU_G01_50W_AT|||||||6|0|G8HOME24286138455395002||001||||||||01"],
+      "Ctn": 32, "Qty": 192, "Pcs": 0, "Inner_Carton": 6, "Inner_Pallet": 32,
+      "NW": 0.0, "GW": 1.637
     }
-  ]
+  ],
+  "fromSystem": "IdentifyService",
+  "Pallet_Current": 1
 }
 ```
+
+**Lệnh tổng / lệnh con:** WCS gửi **mỗi pallet một bản tin** (`info_detail` có 1 phần tử, mỗi
+bản tin một `Task_ID`; tiền tố `1-` của `Task_ID` trùng `Pallet_Current`). Các pallet cùng lệnh
+tổng chung `PO_ID` / `PO_Name`; trạm cộng dồn tiến độ theo `PO_Name`. WCS **không gửi tổng số
+pallet** của lệnh – chỉ có số thứ tự pallet `Pallet_Current`. Trạm vẫn nhận bản tin nhiều pallet.
 
 **Cấp lệnh**
 
@@ -88,11 +98,12 @@ sau.
 | `PO_ID` | số nguyên > 0 (nhận cả chuỗi số) | có | Mã lệnh; gửi lại trong IF-03 |
 | `Task_ID` | chuỗi | nên có | Mã tác vụ; gửi lại trong IF-03; khoá hủy lệnh IF-04 |
 | `info_detail` | mảng (tên khác: `InforDetail`, `infor_detail`) | có, ≥ 1 phần tử | Mỗi phần tử là một pallet |
-| `WH_Code` | chuỗi | | Mã kho; in trên tem thùng; gửi lại trong IF-03 |
+| `WH_Code` | chuỗi | | Mã kho; gửi lại trong IF-03 (từ 2.4.0 không in trên tem) |
 | `Line_ID` | chuỗi (`LineId`, `LineProduction`) | | Dây chuyền; mặc định `LINE_01`; gửi lại trong IF-03 |
-| `PO_Name` | chuỗi | | Tên lệnh (pallet có `PO_Name` riêng thì dùng của pallet) |
+| `PO_Name` | chuỗi | | Mã lệnh tổng (vd. `VAS-091026-3`): in nguyên dòng "Mã lệnh" trên tem thùng, gom tiến độ các pallet cùng lệnh. Pallet có `PO_Name` riêng thì dùng của pallet; thiếu thì tem in `PO_ID` |
+| `Pallet_Current` | số | | Số thứ tự pallet trong lệnh tổng (WCS gửi ở cấp lệnh; trạm nhận cả trong `info_detail`). Lưu, hiện ở thẻ Thông số |
 | `fromSystem` | chuỗi (`From_System`) | | Chỉ lưu |
-| `Weight_ref`, `MFG_Date` | | | Giá trị mặc định cho các pallet không có trường này |
+| `Weight_ref`, `GW`, `MFG_Date` | | | Giá trị mặc định cho các pallet không có trường này |
 
 **Cấp pallet (`info_detail[]`)**
 
@@ -101,11 +112,13 @@ sau.
 | `Pallet_ID` | chuỗi (`PalletId`) | có | Mã pallet; `palletID` của IF-03 |
 | `Carton_List` | mảng chuỗi (`CartonList`) | có, ≥ 1 | Mỗi chuỗi là một thùng (quy tắc tách mã bên dưới) |
 | `Location` | chuỗi | | Vị trí sàn của pallet, hiện trên màn hình |
-| `Item_Code` / `Item_Name` | chuỗi | | Tên sản phẩm trên màn hình và tem (ưu tiên `Item_Name`) |
-| `Weight_ref` | số (gam) | | > 0 thì dùng làm khối lượng chuẩn khi cân; không có thì dùng cài đặt của trạm |
-| `MFG_Date` | chuỗi | | Ngày sản xuất, in dòng NSX trên tem thùng (`dd/mm/yyyy`; nhận cả `yyyy-mm-dd`). Trạm được sửa tay NSX của lệnh chưa định danh thùng nào |
-| `Inner_Carton` | số | | Quy cách – số chiếc / thùng, in dòng "Quy cach" trên tem thùng (không có thì lấy `Qty / Ctn`) |
-| `Ctn`, `Qty`, `Pcs`, `Inner_Pallet`, `Pallet_Current` | số | | Lưu; số thùng thực tế lấy theo độ dài `Carton_List` |
+| `Item_Code` / `Item_Name` | chuỗi | | Tên sản phẩm trên màn hình và tem, in nguyên như gửi (ưu tiên `Item_Name`) |
+| `GW` | số thực (**kg / thùng**) | | Khối lượng cả bì một thùng, vd. `1.637`. Trạm đổi ra gam (× 1000 → 1637 g) làm **khối lượng chuẩn** khi cân |
+| `NW` | số thực (kg) | | Khối lượng tịnh – chỉ lưu |
+| `Weight_ref` | số (gam) | | Khối lượng chuẩn tính bằng gam (công cụ mô phỏng / nguồn khác). > 0 thì dùng trước `GW`. Không có cả `Weight_ref` lẫn `GW` (hoặc = 0) thì dùng cài đặt của trạm |
+| `MFG_Date` | chuỗi | | Ngày sản xuất, in dòng NSX trên tem thùng (`dd/mm/yyyy`; nhận cả `yyyy-mm-dd`). Trạm sửa tay được NSX của lệnh đang làm bất cứ lúc nào – áp dụng từ thùng in tiếp theo trở đi, tem đã in giữ ngày cũ (lệnh làm qua nhiều ngày) |
+| `Inner_Carton` | số | | Quy cách – số chiếc / thùng, in dòng "Quy cách : 6 chiếc" trên tem thùng (không có thì lấy `Qty / Ctn`) |
+| `Ctn`, `Qty`, `Pcs`, `Inner_Pallet` | số | | Lưu; số thùng thực tế lấy theo độ dài `Carton_List` |
 
 **Tách mã thùng:** mỗi chuỗi trong `Carton_List` được cắt khoảng trắng rồi tách theo `|`. Có từ
 11 phần trở lên thì mã thùng là **phần thứ 10**; ít hơn thì dùng nguyên chuỗi. Chuỗi gốc được lưu
@@ -230,4 +243,6 @@ mã cũ nhưng nay gửi theo từng pallet, không còn trường `status: 8`.
    2xx là xong; IF-05 báo lỗi sau đó chỉ hiện thông báo, không mở lại pallet.
 5. **Định dạng thật của `Carton_List`** (2–3 mẫu) và vị trí mã thùng (hiện: phần thứ 10 khi có từ
    11 phần `|`).
-6. Đơn vị `Weight_ref` (trạm hiểu là gam) và định dạng `MFG_Date`.
+6. Khối lượng: WCS gửi `GW` (trạm hiểu là **kg / thùng**, bản tin 19/10/2026: `1.637` cho thùng 6
+   bóng T50) – cần xác nhận đơn vị và là khối lượng một thùng. `MFG_Date` nhận `dd/mm/yyyy`
+   (bản tin thật: `09/10/2026`).

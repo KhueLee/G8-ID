@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.3.3)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.0)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -222,10 +222,11 @@ Component rồi mở lại `chay_dinh_danh.bat`.
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.3.3 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.0 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|
+| 2.4.0 | Lệnh WCS: đọc **`GW`** (kg / thùng, vd. `1.637`) đổi ra gam (1637 g) làm khối lượng chuẩn khi cân – trước đây chỉ đọc `Weight_ref` nên lệnh WCS thật luôn cân theo cài đặt trạm (300 g); `Weight_ref` (gam) vẫn nhận và dùng trước `GW`. `Pallet_Current` lấy ở cấp lệnh (đúng bản tin WCS), không có mới tìm trong `info_detail`; hiện ở thẻ Thông số cùng khối lượng chuẩn. Ngày sản xuất: sửa tay được cả khi lệnh đã có thùng đạt – áp dụng từ thùng in tiếp theo trở đi cho mọi pallet còn lại của lệnh, tem đã in giữ ngày cũ (lệnh làm qua nhiều ngày). Tem: dòng **"Mã lệnh"** in `PO_Name` (vd. `VAS-091026-3`, thiếu thì `PO_ID`) thay cho `WH_Code`; nhãn tiếng Việt có dấu ("Quy cách : 6 chiếc", "Mã lệnh", "NSX"), dữ liệu từ lệnh in nguyên như WCS gửi. Trang *In PDF mã hiện tại* in giống vậy. |
 | 2.3.3 | Tem: dòng "Ma Pallet" đổi thành **"Quy cach : N chiec"** – số chiếc / thùng lấy theo `Inner_Carton` của lệnh; lệnh không gửi `Inner_Carton` thì lấy `Qty / Ctn` (chia hết), không có cả hai thì để trống. Trang *In PDF mã hiện tại* in giống vậy. |
 | 2.3.2 | Tem: logo G8HOME mới (`drivers/G8_Label.bmp`, đen trắng 100x55 điểm, nằm trong khu logo cũ cạnh số thứ tự thùng). Trang *In PDF mã hiện tại* dùng cùng ảnh logo thay cho chữ "G8HOME". |
 | 2.3.1 | Tem: **mã QR và dải dưới cùng đều là nguyên phần tử `Carton_List`** WMS gửi (vd. `TRU_V01_10W_AT\|\|\|\|\|\|\|48\|0\|G8HOME…\|\|001\|…\|01`) để nhà máy đọc mã sản phẩm. Đầu đọc quét tem → phần mềm tách mã định danh (phần thứ 10) rồi mới so khớp với thùng đang làm. Chuỗi dài: mã QR tự nhỏ ô lại cho vừa khung (64 ký tự = 33 ô x 7 điểm ~ 29 mm), chữ dải dưới tự thu cho vừa 1 dòng (~2 mm). Trang *In PDF mã hiện tại* in giống vậy. |

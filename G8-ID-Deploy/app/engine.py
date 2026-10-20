@@ -71,13 +71,32 @@ def fmt_date(v):
     return s
 
 
+def std_weight_g(item, data):
+    """Khối lượng chuẩn 1 thùng (gam): Weight_ref (gam) nếu > 0; không thì GW WCS gửi
+    (kg / thùng, vd. 1.637) x 1000; không có cả hai -> 0 (dùng cài đặt của trạm)."""
+    w = to_int(field(item, "Weight_ref", "WeightRef", default=field(data, "Weight_ref")))
+    if w > 0:
+        return w
+    try:
+        gw = float(field(item, "GW", default=field(data, "GW")) or 0)
+    except (TypeError, ValueError):
+        gw = 0.0
+    return int(round(gw * 1000)) if gw > 0 else 0
+
+
+def order_code(p):
+    """Mã lệnh in trên tem: PO_Name WCS gửi (vd. VAS-091026-3), để nguyên; thiếu thì PO_ID."""
+    p = p or {}
+    return str(p.get("po_name") or p.get("po_id") or "")
+
+
 def spec_text(p):
-    """Quy cách in trên tem: "<số> chiec" theo Inner_Carton; lệnh không gửi thì Qty / Ctn."""
+    """Quy cách in trên tem: "<số> chiếc" theo Inner_Carton; lệnh không gửi thì Qty / Ctn."""
     p = p or {}
     n = to_int(p.get("inner_carton"))
     if n <= 0 and to_int(p.get("ctn")) > 0 and to_int(p.get("qty")) % to_int(p.get("ctn")) == 0:
         n = to_int(p.get("qty")) // to_int(p.get("ctn"))
-    return "%d chiec" % n if n > 0 else ""
+    return "%d chiếc" % n if n > 0 else ""
 
 
 def parse_carton(raw):
@@ -182,7 +201,10 @@ class Engine:
 
     # ------------------------------------------------------------------ ngày sản xuất
     # Mặc định in ngày sản xuất (NSX) theo lệnh. Thẻ Cài đặt -> Cài đặt vận hành cho sửa tay
-    # NSX của lệnh đang làm, chỉ khi lệnh đó chưa có thùng nào đạt; lệnh mới về lại theo lệnh.
+    # NSX của lệnh đang làm bất cứ lúc nào (cả khi lệnh đã có thùng đạt): một lệnh có thể làm qua
+    # nhiều ngày. Engine không bắt Dừng; giao diện mở thẻ Cài đặt chỉ khi đã Dừng.
+    # Ngày mới áp dụng từ thùng in tiếp theo trở đi (mọi pallet còn lại của lệnh); thùng đã in giữ
+    # NSX đã in (lưu ở từng thùng, in lại tem dùng đúng ngày đó). Lệnh mới về lại theo lệnh.
     def _mfg_doc(self):
         return db.settings_col().find_one({"_id": "mfg_override"}) or {}
 
@@ -192,15 +214,11 @@ class Engine:
             return doc.get("date", "")
         return fmt_date((p or {}).get("mfg_date"))
 
-    def _order_started(self, po_key):
-        """Lệnh đã có thùng đạt (đang làm hoặc pallet đã xong) -> không cho sửa NSX nữa."""
-        d = self.db
-        ids = [x["pallet_id"] for x in d.pallets.find({"po_key": po_key}, {"pallet_id": 1})]
-        if ids and d.parcels.count_documents({"pallet_id": {"$in": ids}, "status": {"$gte": 1}},
-                                             limit=1):
-            return True
-        return d.pallets_his.count_documents({"po_key": po_key, "carton_ok": {"$gt": 0}},
-                                             limit=1) > 0
+    def _next_carton(self, p):
+        """Thùng sẽ in tiếp theo của pallet (để báo ngày mới áp dụng từ thùng nào)."""
+        r = self.db.parcels.find_one({"pallet_id": p["pallet_id"], "status": 0},
+                                     sort=[("seq", ASCENDING)])
+        return r.get("seq") if r else None
 
     def mfg_info(self):
         p = self._front_pallet()
@@ -211,7 +229,8 @@ class Engine:
         return {"has_order": True, "po": p.get("po_name") or p.get("po_id"),
                 "order_date": fmt_date(p.get("mfg_date")), "manual": manual,
                 "date": doc.get("date", "") if manual else "",
-                "effective": self._mfg_for(p, doc), "locked": self._order_started(p.get("po_key"))}
+                "effective": self._mfg_for(p, doc), "pallet_id": p["pallet_id"],
+                "next_seq": self._next_carton(p)}
 
     def set_mfg(self, enabled, date):
         enabled = bool(enabled)
@@ -220,11 +239,6 @@ class Engine:
             p = self._front_pallet()
             if p is None:
                 raise OrderError("Chưa có lệnh sản xuất. Ngày sản xuất chỉ sửa được cho lệnh đã về bàn.")
-            if self.running:
-                raise OrderError("Hãy bấm Dừng trước khi sửa ngày sản xuất.")
-            if self._order_started(p.get("po_key")):
-                raise OrderError("Lệnh %s đã định danh thùng / pallet: không sửa được ngày sản xuất "
-                                 "nữa." % (p.get("po_name") or p.get("po_id")))
             if enabled:
                 try:
                     time.strptime(date, "%d/%m/%Y")
@@ -234,9 +248,12 @@ class Engine:
                    "date": date if enabled else "", "at": db.now()}
             db.settings_col().replace_one({"_id": "mfg_override"}, doc, upsert=True)
             self._dirty = True
-        log.info("Ngày sản xuất lệnh %s: %s", p.get("po_key"),
-                 "SỬA TAY " + date if enabled else "theo lệnh (%s)" % fmt_date(p.get("mfg_date")))
-        self.event("mfg_date", po_key=p.get("po_key"), enabled=enabled, date=doc["date"])
+            seq = self._next_carton(p)
+        log.info("Ngày sản xuất lệnh %s: %s - áp dụng từ pallet %s thùng STT %s", p.get("po_key"),
+                 "SỬA TAY " + date if enabled else "theo lệnh (%s)" % fmt_date(p.get("mfg_date")),
+                 p["pallet_id"], seq if seq else "(pallet đã đủ thùng)")
+        self.event("mfg_date", po_key=p.get("po_key"), enabled=enabled, date=doc["date"],
+                   pallet_id=p["pallet_id"], from_seq=seq)
         return self.mfg_info()
 
     # ------------------------------------------------------------------ tiện ích
@@ -365,11 +382,12 @@ class Engine:
                     pcs=to_int(field(item, "Pcs")),
                     inner_carton=to_int(field(item, "Inner_Carton")),
                     inner_pallet=to_int(field(item, "Inner_Pallet")),
-                    weight_ref=to_int(field(item, "Weight_ref", "WeightRef",
-                                            default=field(data, "Weight_ref"))),
+                    weight_ref=std_weight_g(item, data),
+                    gw=field(item, "GW"), nw=field(item, "NW"),
                     mfg_date=str(field(item, "MFG_Date", "MfgDate",
                                        default=field(data, "MFG_Date", default="")) or ""),
-                    pallet_current=to_int(field(item, "Pallet_Current")),
+                    pallet_current=to_int(field(data, "Pallet_Current",
+                                                default=field(item, "Pallet_Current"))),
                     carton_count=len(rows), created_at=db.now()))
                 parcels.extend(rows)
             if not pallets:
@@ -763,7 +781,7 @@ class Engine:
         mfg = self._mfg_for(p)
         printed = self.dev.printer.print_carton(
             code, p.get("item_name") or p.get("item_code", ""), pallet_id,
-            p.get("wh_code", ""), mfg, seq=parcel.get("seq"),
+            order_code(p), mfg, seq=parcel.get("seq"),
             received_code=parcel.get("received_code", ""), spec=spec_text(p))
         self.db.parcels.update_one({"_id": parcel["_id"]},
                                    {"$inc": {"print_count": 1}, "$set": {"mfg_date": mfg}})
@@ -1021,7 +1039,7 @@ class Engine:
             raise OrderError("Chưa có thùng nào đã in.")
         p = self.db.pallets.find_one({"pallet_id": r["pallet_id"]}) or {}
         ok = self.dev.printer.print_carton(r["parcel_code"], p.get("item_name") or p.get("item_code", ""),
-                                           r["pallet_id"], p.get("wh_code", ""),
+                                           r["pallet_id"], order_code(p),
                                            r.get("mfg_date") or self._mfg_for(p), seq=r.get("seq"),
                                            received_code=r.get("received_code", ""), spec=spec_text(p))
         log.info("In lại tem thùng %s: %s", r["parcel_code"], "OK" if ok else "LỖI")
@@ -1096,7 +1114,7 @@ class Engine:
                                                                  job["total"]), ORANGE)
                 code = r["parcel_code"]
                 ok = printer.print_carton(code, p.get("item_name") or p.get("item_code", ""), pid,
-                                          p.get("wh_code", ""), r.get("mfg_date") or self._mfg_for(p),
+                                          order_code(p), r.get("mfg_date") or self._mfg_for(p),
                                           seq=r.get("seq"), received_code=r.get("received_code", ""),
                                           spec=spec_text(p))
                 log.info("[REPRINT] pallet %s thùng %s (STT %s): %s", pid, code, r.get("seq"),
@@ -1203,7 +1221,8 @@ class Engine:
                 "status": p.get("status"), "wh_code": p.get("wh_code", ""),
                 "line_id": p.get("line_id", ""), "po_id": p.get("po_id"),
                 "task_id": p.get("task_id", ""), "ctn": p.get("ctn", 0), "qty": p.get("qty", 0),
-                "pcs": p.get("pcs", 0),
+                "pcs": p.get("pcs", 0), "pallet_current": p.get("pallet_current", 0),
+                "weight_ref": p.get("weight_ref", 0),
                 "created_at": p["created_at"].strftime("%d/%m/%Y %H:%M:%S")
                 if p.get("created_at") else ""}
 
@@ -1244,7 +1263,7 @@ class Engine:
             raise OrderError("Không có ParcelCode nào thuộc pallet hiện tại.")
         mfg = self._mfg_for(p)
         return {"pallet_id": p["pallet_id"], "item": p.get("item_name") or p.get("item_code", ""),
-                "wh_code": p.get("wh_code", ""), "spec": spec_text(p),
+                "order": order_code(p), "spec": spec_text(p),
                 "rows": [{"seq": r["seq"], "code": r["parcel_code"],
                           "full": r.get("received_code") or r["parcel_code"],
                           "mfg_date": r.get("mfg_date") or mfg} for r in rows]}
