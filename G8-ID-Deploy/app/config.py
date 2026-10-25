@@ -6,7 +6,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.environ.get("G8ID_CONFIG") or os.path.join(BASE_DIR, "config.json")
-VERSION = "2.4.3"
+VERSION = "2.4.4"
 
 DEFAULTS = {
     "station_id": "ST01",

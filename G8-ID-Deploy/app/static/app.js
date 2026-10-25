@@ -63,7 +63,7 @@ function render(s) {
 
   const p = s.pallet || {};
   $('curDone').textContent = s.carton[0]; $('curTotal').textContent = '/' + s.carton[1];
-  const rows = { 'f-po': p.po, 'f-pallet': p.pallet_id, 'f-loc': p.location, 'f-item': p.item, 'f-spec': p.spec,
+  const rows = { 'f-po': p.po, 'f-pallet': p.lpn || p.pallet_id, 'f-loc': p.location, 'f-item': p.item, 'f-spec': p.spec,
     'f-weight': p.weight, 'f-pallets': s.pallets[0] + '/' + s.pallets[1], 'f-order': s.order[0] + '/' + s.order[1],
     'f-date': p.mfg_date || s.date };
   for (const id in rows) setFit($(id), rows[id] || 'N/A', 28, 14, 2);
@@ -328,7 +328,7 @@ const fromIso = d => d ? d.split('-').reverse().join('/') : '';
 let mfgLocked = true;
 function mfgUi() { $('mf-date').disabled = mfgLocked || !$('mf-on').checked; }
 $('mf-on').onchange = mfgUi;
-const mfgFrom = m => m.next_seq ? `pallet ${m.pallet_id}, thùng STT ${m.next_seq}` : `pallet kế tiếp của lệnh`;
+const mfgFrom = m => m.next_seq ? `pallet ${m.lpn || m.pallet_id}, thùng STT ${m.next_seq}` : `pallet kế tiếp của lệnh`;
 function showMfg(m) {
   mfgLocked = !m.has_order;
   $('mf-po').textContent = m.has_order ? m.po : 'Chưa có lệnh';
@@ -354,7 +354,7 @@ async function saveMfg() {
 }
 
 // ---------- thẻ Thông số: bố cục và nút như phần mềm cũ ----------
-const PEND_COLS = [['inner_pallet', 'Inner_Pallet'], ['pallet_id', 'Pallet_ID'], ['item_code', 'Item_Code'], ['item_name', 'Item_Name'], ['po', 'PO_Name'],
+const PEND_COLS = [['inner_pallet', 'Inner_Pallet'], ['lpn', 'Pallet_ID'], ['item_code', 'Item_Code'], ['item_name', 'Item_Name'], ['po', 'PO_Name'], ['task_id', 'Task_ID'],
   ['pallet_current', 'Pallet_Current'], ['weight_ref', 'Chuẩn (g)'], ['location', 'Location'], ['status', 'Status'], ['cartons', 'Thùng đạt'], ['mfg_date', 'MFG_Date'], ['wh_code', 'WH_Code'], ['line_id', 'Line_ID'], ['po_id', 'PO_ID'], ['created_at', 'CreatedAt']];
 const DONE_COLS = PEND_COLS.concat([['done_at', 'DoneAt'], ['done_reason', 'DoneReason'], ['ctn', 'Ctn'], ['qty', 'Qty'], ['pcs', 'Pcs']]);
 const PARCEL_COLS = [['stt', 'STT'], ['code', 'Mã định danh'], ['text', 'Trạng thái'], ['mfg_date', 'Mfg_Date'], ['weight', 'Khối lượng (g)'], ['prints', 'Số lần in'], ['done_at', 'Thời gian']];
@@ -388,7 +388,7 @@ $('g-pending').onclick = e => { const tr = e.target.closest('tr[data-i]'); if (!
 $('g-completed').onclick = e => {
   const tr = e.target.closest('tr[data-i]'); if (!tr) return;
   const r = ord.completed[tr.dataset.i];
-  selDone = { pallet_id: r.pallet_id, key: r.key, inner: r.inner_pallet }; lastSel = 'completed'; drawOrders();
+  selDone = { pallet_id: r.pallet_id, lpn: r.lpn, key: r.key, inner: r.inner_pallet }; lastSel = 'completed'; drawOrders();
 };
 $('g-pending').ondblclick = $('g-completed').ondblclick = () => loadParcels();
 ['h-pallet', 'h-po'].forEach(id => $(id).onkeydown = e => { if (e.key === 'Enter') loadOrders(); });
@@ -427,7 +427,7 @@ async function sendIdentify() {
 }
 async function reloadTask() {
   if (!selDone) return alertBox('Vui lòng chọn một lệnh ở bảng LỆNH ĐÃ HOÀN THÀNH.');
-  if (!(await needPass()) || !(await confirmBox(`Bạn có chắc chắn muốn reload lệnh sản xuất này không?\n\nPallet_ID: ${selDone.pallet_id}\nInner_Pallet: ${selDone.inner}`, 'Thực hiện lại', 'Yes', 'No'))) return;
+  if (!(await needPass()) || !(await confirmBox(`Bạn có chắc chắn muốn reload lệnh sản xuất này không?\n\nPallet_ID: ${selDone.lpn}\nInner_Pallet: ${selDone.inner}`, 'Thực hiện lại', 'Yes', 'No'))) return;
   opDone(await api('/api/reload', { pallet_id: selDone.pallet_id, key: selDone.key }),'Reload pallet từ lịch sử thành công.');
 }
 async function loadParcels(quiet) {
@@ -445,7 +445,7 @@ async function loadParcels(quiet) {
   }
   parcelsOf.item = r.item; parcelsOf.rows = r.rows;
   $('ps-total').textContent = `Tổng số thùng trong pallet: ${r.done} / ${r.total}`;
-  $('ps-pallet').textContent = '— ' + r.pallet_id;
+  $('ps-pallet').textContent = '— ' + (r.lpn || r.pallet_id); parcelsOf.lpn = r.lpn;
   const all = r.rows.length > 0 && r.rows.every(x => selCodes.has(x.code));
   $('g-parcels').innerHTML = `<tr><th><input type="checkbox" id="ps-all" ${all ? 'checked' : ''} title="Chọn tất cả"></th>${PARCEL_COLS.map(c => `<th>${c[1]}</th>`).join('')}</tr>` +
     (r.rows.map((x, i) => `<tr data-i="${i}" class="${selCodes.has(x.code) ? 'sel' : ''}"><td><input type="checkbox" ${selCodes.has(x.code) ? 'checked' : ''}></td>${PARCEL_COLS.map(c => `<td>${esc(x[c[0]])}</td>`).join('')}</tr>`).join('')
@@ -464,7 +464,7 @@ $('g-parcels').onclick = e => {
 async function reprintCodes() {
   if (!parcelsOf || !selCodes.size) return alertBox('Vui lòng chọn một thùng (parcel) để in lại.');
   const codes = [...selCodes];
-  if (!(await needPass()) || !(await confirmBox(codes.length === 1 ? `In lại tem thùng ${codes[0]}?` : `In lại ${codes.length} tem của pallet ${parcelsOf.pallet_id}?`, 'In lại mã định danh', 'Yes', 'No'))) return;
+  if (!(await needPass()) || !(await confirmBox(codes.length === 1 ? `In lại tem thùng ${codes[0]}?` : `In lại ${codes.length} tem của pallet ${parcelsOf.lpn || parcelsOf.pallet_id}?`, 'In lại mã định danh', 'Yes', 'No'))) return;
   const r = await api('/api/reprint_pallet', { pallet_id: parcelsOf.pallet_id, codes });
   if (!r.ok) return alertBox('In lại tem thất bại: ' + r.error, 'LỖI');
   // In chạy nền (bấm Dừng để hủy); chờ xong rồi báo kết quả như bản cũ.

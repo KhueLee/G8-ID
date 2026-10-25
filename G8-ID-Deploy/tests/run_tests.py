@@ -14,6 +14,7 @@ import tempfile
 import time
 import traceback
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -681,8 +682,12 @@ def e2e_tests(env):
             s, r = http(ORDER + "/ids/orderTask/", x)
             assert (s, r["code"]) == (200, 1000), (s, r)
         t = time.strftime("%Y-%m-%d")
-        ids = [x["pallet_id"] for x in http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]["pending"]]
-        assert len(ids) == 2 and ids[0] == "LPN0-0-0" and ids[1].startswith("LPN0-0-0#"), ids
+        pend = http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]["pending"]
+        assert [(x["pallet_id"], x["lpn"]) for x in pend] == \
+            [(o(1)["Task_ID"], "LPN0-0-0"), (o(2)["Task_ID"], "LPN0-0-0")], pend
+        # Tìm "Mã pallet" theo LPN ra cả hai; theo Task_ID ra đúng một.
+        assert len(http(APP + "/api/orders?pallet=LPN0-0-0")[1]["pending"]) == 2
+        assert len(http(APP + "/api/orders?pallet=2-190918952")[1]["pending"]) == 1
         if not state()["running"]:
             start()
         for k in range(2):
@@ -710,14 +715,14 @@ def e2e_tests(env):
     def t_reprint_history():
         his = http(APP + "/api/history")[1]["rows"]
         pid = his[0]["pallet_id"]
-        rows = http(APP + "/api/history/parcels?pallet=" + pid)[1]["rows"]
+        rows = http(APP + "/api/history/parcels?pallet=" + urllib.parse.quote(pid))[1]["rows"]
         codes = [x["code"] for x in rows]
         assert len(codes) == 3, codes
         r = http(APP + "/api/reprint_pallet", {"pallet_id": pid})[1]
         assert r["ok"] and r["total"] == 3, r
         j = wait(job_done, 20, "in lại xong")
         assert (j["done"], j["error"], j["cancelled"]) == (3, "", False), j
-        assert state()["message"] == "ĐÃ IN LẠI 3 TEM CỦA PALLET " + pid, state()["message"]
+        assert state()["message"] == "ĐÃ IN LẠI 3 TEM CỦA PALLET " + his[0]["lpn"], state()["message"]
         labels = http(SIMU + "/sim/state")[1]["labels"][-3:]
         assert [x["type"] for x in labels] == ["carton"] * 3, labels
         assert [x["code"] for x in labels] == codes, labels
@@ -741,7 +746,7 @@ def e2e_tests(env):
         stop()                                              # lệnh mới tự Bắt đầu
         today = time.strftime("%d/%m/%Y")
         m = http(APP + "/api/mfg")[1]["mfg"]
-        assert m["has_order"] and not m["manual"] and m["pallet_id"] == p1 and m["next_seq"] == 1, m
+        assert m["has_order"] and not m["manual"] and m["lpn"] == p1 and m["next_seq"] == 1, m
         assert m["order_date"] == m["effective"] == today, m
         r = http(APP + "/api/mfg", {"enabled": True, "date": "31/02/2026"})[1]
         assert not r["ok"] and "không hợp lệ" in r["error"], r
@@ -757,7 +762,7 @@ def e2e_tests(env):
             assert e.code == 403, e.code
         t = time.strftime("%Y-%m-%d")
         ords = http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]
-        assert [x["pallet_id"] for x in ords["pending"]] == [p1, p2], ords["pending"]
+        assert [x["lpn"] for x in ords["pending"]] == [p1, p2], ords["pending"]
         assert all(x["mfg_date"] == "01/02/2026" for x in ords["pending"])
         assert ords["stats"]["active"] == 2, ords["stats"]
         r = http(APP + "/api/identify", {"pallet_id": p1})[1]
@@ -811,13 +816,13 @@ def e2e_tests(env):
         r = http(APP + "/api/orders/pull_next", {})[1]
         assert r["ok"] and r["pallet_id"] == p2, r
         r = http(APP + "/api/orders/delete", {"pallet_id": p2})[1]
-        assert r["ok"] and r["cancelled"] == [p2], r
+        assert r["ok"] and len(r["cancelled"]) == 1, r
         assert not state()["has_order"]
         ords = http(APP + "/api/orders?from=%s&to=%s&pallet=%s" % (t, t, p2))[1]
         assert ords["completed"][0]["status"] == "CANCEL", ords["completed"]
         assert http(APP + "/api/reload", {"pallet_id": p2})[1]["ok"]
         ords = http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]
-        assert [x["pallet_id"] for x in ords["pending"]] == [p2], ords["pending"]
+        assert [x["lpn"] for x in ords["pending"]] == [p2], ords["pending"]
         assert http(APP + "/api/orders/delete", {"pallet_id": p2})[1]["ok"]
         assert not state()["has_order"]
 
@@ -948,7 +953,7 @@ def e2e_tests(env):
         sent = len(http(SIMU + "/sim/state")[1]["received"])
         s, r = http(ORDER + "/ids/cancelTask/", {"Task_ID": "1-555001__10:00:01"})
         assert s == 200 and state()["running"], (s, r)
-        assert state()["pallet"]["pallet_id"] == p1 and state()["pallets"] == [0, 1], state()["pallets"]
+        assert state()["pallet"]["lpn"] == p1 and state()["pallets"] == [0, 1], state()["pallets"]
         assert state()["can_identify"]
         wait(lambda: "LỆNH ĐÃ DỪNG" in state()["message"], 10, "báo lệnh đã dừng khi chờ thùng")
         carton_ok(2)                                       # vẫn làm nốt được
@@ -967,7 +972,7 @@ def e2e_tests(env):
         assert s == 200 and r["code"] == 1000
         assert len(http(APP + "/api/info")[1]["queue"]) == 2, "lệnh lặp không được nhân đôi"
         p1, p2 = [d["Pallet_ID"] for d in o["info_detail"]]
-        wait(lambda: state()["running"] and state()["pallet"]["pallet_id"] == p1, 10,
+        wait(lambda: state()["running"] and state()["pallet"]["lpn"] == p1, 10,
              "lệnh mới tự Bắt đầu pallet 1")
         sent = len(http(SIMU + "/sim/state")[1]["received"])
         # Dừng PO khi pallet đang làm chưa có thùng đạt: vẫn giữ pallet đang làm, hủy pallet chờ.

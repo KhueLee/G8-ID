@@ -231,6 +231,7 @@ class Engine:
                 "order_date": fmt_date(p.get("mfg_date")), "manual": manual,
                 "date": doc.get("date", "") if manual else "",
                 "effective": self._mfg_for(p, doc), "pallet_id": p["pallet_id"],
+                "lpn": p.get("lpn") or p["pallet_id"],
                 "next_seq": self._next_carton(p)}
 
     def set_mfg(self, enabled, date):
@@ -391,9 +392,9 @@ class Engine:
             "from_system": str(field(data, "fromSystem", "From_System", default="") or ""),
         }
         with self.lock:
-            # WCS gửi mỗi pallet một Task_ID; Pallet_ID (LPN) có thể là mã giữ chỗ dùng chung cho
-            # nhiều pallet, kể cả trong cùng PO (vd. "LPN0-0-0"). Nên lệnh gửi lặp nhận theo
-            # Task_ID + PO_ID; chỉ lệnh không có Task_ID mới so theo LPN như bản cũ.
+            # WCS gửi mỗi pallet một Task_ID; Pallet_ID (LPN) dùng chung cho nhiều pallet, kể cả
+            # khác PO (vd. "LPN0-0-0", "LPN02777"). Nên pallet được định danh theo Task_ID, lệnh
+            # gửi lặp nhận theo Task_ID + PO_ID; chỉ lệnh không có Task_ID mới so theo LPN.
             task_id = common["task_id"]
             if task_id and self.db.pallets.find_one({"task_id": task_id, "po_id": po_id}, {"_id": 1}):
                 log.warning("Task_ID %s (PO_ID=%s) đã có trong danh sách - bỏ qua (lệnh gửi lặp)",
@@ -401,7 +402,7 @@ class Engine:
                 return "duplicate"
             batch = uuid.uuid4().hex[:12]
             pallets, parcels, groups, seen = [], [], [], set()
-            for item in detail:
+            for idx, item in enumerate(detail, 1):
                 lpn = str(field(item, "Pallet_ID", "PalletId", default="") or "").strip()
                 if not lpn:
                     raise OrderError("Thiếu Pallet_ID trong info_detail")
@@ -412,19 +413,21 @@ class Engine:
                 cartons = field(item, "Carton_List", "CartonList") or []
                 if not cartons:
                     raise OrderError(f"Pallet {lpn} không có Carton_List")
+                # Khóa nội bộ: Task_ID (mỗi pallet một task); bản tin nhiều pallet -> Task_ID#n.
+                key = (task_id if len(detail) == 1 else "%s#%d" % (task_id, idx)) if task_id else lpn
                 rows = []
                 for n, raw in enumerate(cartons, 1):
                     code, received = parse_carton(raw)
                     if not code or code in seen:
                         raise OrderError(f"Mã thùng trống hoặc trùng trong lệnh: {code}")
                     seen.add(code)
-                    rows.append({"batch": batch, "pallet_id": lpn, "seq": n,
+                    rows.append({"batch": batch, "pallet_id": key, "seq": n,
                                  "parcel_code": code, "received_code": received, "status": 0,
                                  "fail": False, "print_count": 0, "weight": None,
                                  "created_at": db.now()})
                 po_name = str(field(item, "PO_Name", default=common["po_name"]) or "")
                 pallets.append(dict(
-                    common, batch=batch, pallet_id=lpn, lpn=lpn, status="WAIT",
+                    common, batch=batch, pallet_id=key, lpn=lpn, status="WAIT",
                     po_name=po_name, po_key=po_name or str(po_id),
                     location=str(field(item, "Location", default="") or "").strip(),
                     item_code=str(field(item, "Item_Code", "ItemCode", default="") or ""),
@@ -451,12 +454,12 @@ class Engine:
             base = self.db.meta.find_one_and_update(
                 {"_id": "pallet_seq"}, {"$inc": {"v": len(pallets)}}, upsert=True) or {"v": 0}
             used = {d["pallet_id"] for d in self.db.pallets.find(
-                {"pallet_id": {"$in": [p["lpn"] for p in pallets]}}, {"pallet_id": 1})}
+                {"pallet_id": {"$in": [p["pallet_id"] for p in pallets]}}, {"pallet_id": 1})}
             for i, (p, rows) in enumerate(zip(pallets, groups)):
                 p["seq"] = base.get("v", 0) + i + 1
-                if p["lpn"] in used:
-                    # LPN đang có pallet khác giữ: khóa nội bộ riêng, gửi WMS/RCS vẫn dùng lpn.
-                    p["pallet_id"] = "%s#%d" % (p["lpn"], p["seq"])
+                if p["pallet_id"] in used:
+                    # Lệnh không Task_ID mà LPN đang có pallet khác giữ: khóa riêng theo seq.
+                    p["pallet_id"] = "%s#%d" % (p["pallet_id"], p["seq"])
                     for r in rows:
                         r["pallet_id"] = p["pallet_id"]
                 used.add(p["pallet_id"])
@@ -518,9 +521,9 @@ class Engine:
             q.append({"po_id": po})
         if not q:
             raise OrderError("Task_ID invalid")            # câu trả lời của bản cũ
-        ids, kept = [], []
+        ids, kept, kept_lpn = [], [], []
         with self.lock:
-            proj = {"pallet_id": 1, "po_key": 1, "po_id": 1, "status": 1}
+            proj = {"pallet_id": 1, "lpn": 1, "po_key": 1, "po_id": 1, "status": 1}
             hit = list(self.db.pallets.find({"$or": q}, proj))
             keys = list({h["po_key"] for h in hit if h.get("po_key")})
             pos = list({h["po_id"] for h in hit if h.get("po_id")})
@@ -532,6 +535,7 @@ class Engine:
                 if reason == "CANCEL" and p["status"] in ACTIVE:
                     self.db.pallets.update_one({"_id": p["_id"]}, {"$set": {"order_stopped": True}})
                     kept.append(p["pallet_id"])
+                    kept_lpn.append(p.get("lpn") or p["pallet_id"])
                 else:
                     self._archive(p["pallet_id"], "CANCEL", reason)
                     ids.append(p["pallet_id"])
@@ -540,7 +544,7 @@ class Engine:
                     data, len(ids), ids, kept)
         if kept:
             self._msg("WMS DỪNG LỆNH - LÀM NỐT PALLET %s, HẾT HÀNG THÌ BẤM ĐỊNH DANH"
-                      % ", ".join(kept), RED)
+                      % ", ".join(kept_lpn), RED)
         elif ids and reason == "CANCEL":
             self._msg("HỦY LỆNH SẢN XUẤT-WMS YÊU CẦU", RED)
         self.event("cancel", request=data, pallets=ids, kept=kept)
@@ -1030,7 +1034,7 @@ class Engine:
                 ok, err = self.send_pallet_done(pid)
                 if ok:
                     break
-                self._msg("ĐANG CHỜ GỬI PALLET VỀ SERVER: " + pid, RED)
+                self._msg("ĐANG CHỜ GỬI PALLET VỀ SERVER: " + (cur.get("lpn") or pid), RED)
                 self._light("red")
             self._sleep(0.2)
         self._msg("PALLET OK – TIẾP TỤC SẢN XUẤT", GREEN)
@@ -1064,7 +1068,7 @@ class Engine:
         pallet_id: pallet chọn ở thẻ Thông số ("Gửi định danh"); trống = pallet chờ đầu tiên.
         """
         if pallet_id:
-            p = self.db.pallets.find_one({"pallet_id": pallet_id})
+            p = self._find(self.db.pallets, pallet_id)
             if p is None:
                 return {"ok": False, "error": "Không tìm thấy pallet %s." % pallet_id}
             if p["status"] != "AWAIT_SEND" and not p.get("order_stopped"):
@@ -1083,7 +1087,7 @@ class Engine:
             if not ok_n:
                 # Chưa sản xuất thùng nào: không có gì để báo server, đóng pallet là xong.
                 self._archive(pid, "CANCEL", "ORDER_STOPPED")
-                self._msg("PALLET %s KHÔNG CÓ THÙNG ĐẠT - ĐÃ HỦY, KHÔNG GỬI SERVER" % pid, RED)
+                self._msg("PALLET %s KHÔNG CÓ THÙNG ĐẠT - ĐÃ HỦY, KHÔNG GỬI SERVER" % (p.get("lpn") or pid), RED)
                 return {"ok": True}
             self.db.pallets.update_one({"_id": p["_id"], "status": "PROCESSING"},
                                        {"$set": {"status": "FINALIZING", "identify_requested": True}})
@@ -1205,17 +1209,17 @@ class Engine:
             self._no_job()
             if not self.dev.printer.connected:
                 raise OrderError("KIỂM TRA LẠI KẾT NỐI MÁY IN!!")
-            q = {"pallet_id": pallet_id} if pallet_id else {"status": {"$in": ACTIVE}}
-            p = self.db.pallets.find_one(q, sort=[("seq", ASCENDING)])
+            p = self._find(self.db.pallets, pallet_id) if pallet_id else \
+                self.db.pallets.find_one({"status": {"$in": ACTIVE}}, sort=[("seq", ASCENDING)])
             if p is not None:
                 rows_q, col, source = {"pallet_id": p["pallet_id"]}, self.db.parcels, "đang làm"
             elif not pallet_id:
                 raise OrderError("Chưa có lệnh sản xuất đang chạy.")
             else:
-                p = self.db.pallets_his.find_one({"pallet_id": pallet_id}, sort=[("done_at", -1)])
+                p = self._find(self.db.pallets_his, pallet_id)
                 if p is None:
                     raise OrderError("Không tìm thấy pallet %s." % pallet_id)
-                rows_q = {"pallet_id": pallet_id, "done_at": p["done_at"]}
+                rows_q = {"pallet_id": p["pallet_id"], "done_at": p["done_at"]}
                 col, source = self.db.parcels_his, "lịch sử"
             if codes:
                 rows_q["parcel_code"] = {"$in": codes}
@@ -1240,12 +1244,13 @@ class Engine:
 
     def _reprint_job(self, p, rows, live):
         job, pid, printer = self.job, p["pallet_id"], self.dev.printer
+        name = p.get("lpn") or pid           # tên hiện cho công nhân
         try:
             for r in rows:
                 if self._job_stop.is_set():
                     job["cancelled"] = True
                     break
-                self._msg("ĐANG IN LẠI TEM PALLET %s: %d/%d" % (pid, job["done"] + 1,
+                self._msg("ĐANG IN LẠI TEM PALLET %s: %d/%d" % (name, job["done"] + 1,
                                                                  job["total"]), ORANGE)
                 code = r["parcel_code"]
                 ok = printer.print_carton(code, p.get("item_name") or p.get("item_code", ""), pid,
@@ -1268,20 +1273,29 @@ class Engine:
             job["active"] = False
             if job["error"]:
                 self._msg("IN LẠI TEM PALLET %s LỖI (%d/%d): %s" % (
-                    pid, job["done"], job["total"], job["error"]), RED)
+                    name, job["done"], job["total"], job["error"]), RED)
             elif job["cancelled"]:
-                self._msg("ĐÃ HỦY IN LẠI TEM PALLET %s (%d/%d)" % (pid, job["done"],
+                self._msg("ĐÃ HỦY IN LẠI TEM PALLET %s (%d/%d)" % (name, job["done"],
                                                                    job["total"]), GRAY)
             else:
-                self._msg("ĐÃ IN LẠI %d TEM CỦA PALLET %s" % (job["done"], pid), GREEN)
+                self._msg("ĐÃ IN LẠI %d TEM CỦA PALLET %s" % (job["done"], name), GREEN)
             self.event("reprint_pallet_end", pallet_id=pid, done=job["done"], total=job["total"],
                        error=job["error"], cancelled=job["cancelled"])
 
     # ---- các nút của thẻ Thông số (giữ như bản cũ, cho vận hành thủ công) ----
+    def _find(self, col, pallet_id, **q):
+        """Pallet theo khóa nội bộ (Task_ID); không có thì theo LPN (Pallet_ID gốc của WCS).
+
+        Lịch sử lấy lần xong mới nhất, bảng đang chờ lấy pallet đứng trước.
+        """
+        sort = [("done_at", -1)] if col is self.db.pallets_his else [("seq", ASCENDING)]
+        return col.find_one(dict(q, pallet_id=pallet_id), sort=sort) or \
+            col.find_one(dict(q, lpn=pallet_id), sort=sort)
+
     def _pick_pallet(self, pallet_id):
         """Pallet được chọn ở bảng LỆNH ĐANG CHỜ; không chọn thì pallet đang làm."""
         pallet_id = str(pallet_id or "").strip()
-        p = self.db.pallets.find_one({"pallet_id": pallet_id}) if pallet_id else self._front_pallet()
+        p = self._find(self.db.pallets, pallet_id) if pallet_id else self._front_pallet()
         if p is None:
             raise OrderError("Không tìm thấy pallet %s." % pallet_id if pallet_id else
                              "Chưa có lệnh sản xuất đang chạy.")
@@ -1310,7 +1324,7 @@ class Engine:
             if p is None:
                 raise OrderError("Không có pallet nào đang chờ xử lý.")
         self.event("pull_next", pallet_id=p["pallet_id"])
-        return p["pallet_id"]
+        return p.get("lpn") or p["pallet_id"]       # hiện cho công nhân: "Đã tải lệnh: pallet ..."
 
     def delete_pallet(self, pallet_id=""):
         """"Xóa lệnh đang làm": chuyển pallet sang lịch sử (CANCEL), làm lại được bằng Thực hiện lại."""
@@ -1323,9 +1337,11 @@ class Engine:
     def orders(self, date_from, date_to, pallet="", po=""):
         """Hai bảng của thẻ Thông số + 3 con số thống kê."""
         def like(q):
-            for k, v in (("pallet_id", pallet), ("po_key", po)):
-                if v:
-                    q[k] = {"$regex": re.escape(v), "$options": "i"}
+            if pallet:      # ô "Mã pallet": LPN hoặc Task_ID
+                rx = {"$regex": re.escape(pallet), "$options": "i"}
+                q["$or"] = [{"pallet_id": rx}, {"lpn": rx}, {"task_id": rx}]
+            if po:
+                q["po_key"] = {"$regex": re.escape(po), "$options": "i"}
             return q
 
         doc = self._mfg_doc()
@@ -1350,7 +1366,8 @@ class Engine:
 
     @staticmethod
     def _order_row(p):
-        return {"pallet_id": p["pallet_id"], "inner_pallet": p.get("inner_pallet", 0),
+        return {"pallet_id": p["pallet_id"], "lpn": p.get("lpn") or p["pallet_id"],
+                "inner_pallet": p.get("inner_pallet", 0),
                 "item_code": p.get("item_code", ""), "item_name": p.get("item_name", ""),
                 "po": p.get("po_name") or p.get("po_id"), "location": p.get("location", ""),
                 "status": p.get("status"), "wh_code": p.get("wh_code", ""),
@@ -1366,18 +1383,16 @@ class Engine:
         pallet_id = str(pallet_id or "").strip()
         if not pallet_id:
             raise OrderError("Vui lòng chọn một lệnh (pallet) trước khi tải mã định danh.")
-        p = None if key else self.db.pallets.find_one({"pallet_id": pallet_id})
+        p = None if key else self._find(self.db.pallets, pallet_id)
         if p is not None:
-            rows = self.db.parcels.find({"pallet_id": pallet_id})
+            rows = self.db.parcels.find({"pallet_id": p["pallet_id"]})
             mfg = self._mfg_for(p)
         else:
-            q = {"pallet_id": pallet_id}
-            if key:
-                q["done_at"] = datetime.datetime.strptime(key, "%Y%m%d%H%M%S%f")
-            p = self.db.pallets_his.find_one(q, sort=[("done_at", -1)])
+            q = {"done_at": datetime.datetime.strptime(key, "%Y%m%d%H%M%S%f")} if key else {}
+            p = self._find(self.db.pallets_his, pallet_id, **q)
             if p is None:
                 raise OrderError("Không tìm thấy pallet %s." % pallet_id)
-            rows = self.db.parcels_his.find({"pallet_id": pallet_id, "done_at": p["done_at"]})
+            rows = self.db.parcels_his.find({"pallet_id": p["pallet_id"], "done_at": p["done_at"]})
             mfg = fmt_date(p.get("mfg_date"))
         out = [{"stt": r["seq"], "code": r["parcel_code"], "st": r["status"],
                 "text": "In lỗi" if r["status"] == 0 and r.get("fail") else
@@ -1386,8 +1401,8 @@ class Engine:
                 "prints": r.get("print_count", 0),
                 "done_at": r["done_at"].strftime("%d/%m/%Y %H:%M:%S") if r.get("done_at") else ""}
                for r in rows.sort("seq", ASCENDING).limit(2000)]
-        return {"pallet_id": pallet_id, "item": p.get("item_name") or p.get("item_code", ""),
-                "rows": out, "done": sum(1 for r in out if r["st"] >= 1), "total": len(out)}
+        return {"pallet_id": p["pallet_id"], "lpn": p.get("lpn") or p["pallet_id"],
+                "item": p.get("item_name") or p.get("item_code", ""), "rows": out, "done": sum(1 for r in out if r["st"] >= 1), "total": len(out)}
 
     def label_sheet(self, pallet_id=""):
         """"In PDF mã hiện tại": dữ liệu tem của mọi thùng trong pallet đang làm."""
@@ -1397,7 +1412,8 @@ class Engine:
         if not rows:
             raise OrderError("Không có ParcelCode nào thuộc pallet hiện tại.")
         mfg = self._mfg_for(p)
-        return {"pallet_id": p["pallet_id"], "item": p.get("item_name") or p.get("item_code", ""),
+        return {"pallet_id": p.get("lpn") or p["pallet_id"],
+                "item": p.get("item_name") or p.get("item_code", ""),
                 "order": order_code(p), "spec": spec_text(p),
                 "rows": [{"seq": r["seq"], "code": r["parcel_code"],
                           "full": r.get("received_code") or r["parcel_code"],
@@ -1420,12 +1436,11 @@ class Engine:
         with self.lock:
             if self.db.pallets.count_documents({}, limit=1):
                 raise OrderError("Đang có lệnh sản xuất đang chạy, không thể reload.")
-            q = {"pallet_id": pallet_id}
-            if key:
-                q["done_at"] = datetime.datetime.strptime(key, "%Y%m%d%H%M%S%f")
-            p = self.db.pallets_his.find_one(q, sort=[("done_at", -1)])
+            q = {"done_at": datetime.datetime.strptime(key, "%Y%m%d%H%M%S%f")} if key else {}
+            p = self._find(self.db.pallets_his, pallet_id, **q)
             if p is None:
                 raise OrderError("Không tìm thấy pallet trong lịch sử.")
+            pallet_id = p["pallet_id"]
             rows = list(self.db.parcels_his.find({"pallet_id": pallet_id, "done_at": p["done_at"]})
                         .sort("seq", ASCENDING))
             if not rows:
@@ -1486,8 +1501,8 @@ class Engine:
             std = p.get("weight_ref") or self.settings["scale_value"]
             c["pallet"] = {
                 "po": p.get("po_name") or p.get("po_id"), "task_id": p.get("task_id"),
-                "pallet_id": p["pallet_id"], "location": p.get("location"),
-                "item": p.get("item_name") or p.get("item_code"),
+                "pallet_id": p["pallet_id"], "lpn": p.get("lpn") or p["pallet_id"],
+                "location": p.get("location"), "item": p.get("item_name") or p.get("item_code"),
                 "spec": ("%s Hộp / Thùng" % p["inner_carton"]) if p.get("inner_carton") else "N/A",
                 "weight": "%s ± %s GAM" % (std, self.settings["scale_error"]),
                 "mfg_date": self._mfg_for(p) or time.strftime("%d/%m/%Y"),
@@ -1529,11 +1544,12 @@ class Engine:
     def history(self, date_from, date_to, text="", limit=300):
         q = {"done_at": {"$gte": date_from, "$lt": date_to}}
         if text:
-            q["$or"] = [{"pallet_id": {"$regex": text, "$options": "i"}},
-                        {"po_key": {"$regex": text, "$options": "i"}}]
+            rx = {"$regex": re.escape(text), "$options": "i"}
+            q["$or"] = [{"pallet_id": rx}, {"lpn": rx}, {"task_id": rx}, {"po_key": rx}]
         out = []
         for p in self.db.pallets_his.find(q).sort("done_at", -1).limit(limit):
-            out.append({"pallet_id": p["pallet_id"], "po": p.get("po_name") or p.get("po_id"),
+            out.append({"pallet_id": p["pallet_id"], "lpn": p.get("lpn") or p["pallet_id"],
+                        "task_id": p.get("task_id", ""), "po": p.get("po_name") or p.get("po_id"),
                         "item": p.get("item_name") or p.get("item_code"),
                         "location": p.get("location"), "status": p.get("status"),
                         "reason": p.get("done_reason"),
@@ -1542,6 +1558,8 @@ class Engine:
         return out
 
     def history_parcels(self, pallet_id):
+        h = self._find(self.db.pallets_his, pallet_id)
+        pallet_id = h["pallet_id"] if h else pallet_id
         return [{"stt": r["seq"], "code": r["parcel_code"], "st": r["status"],
                  "weight": r.get("weight"), "prints": r.get("print_count", 0),
                  "done_at": r["done_at"].strftime("%d/%m/%Y %H:%M:%S") if r.get("done_at") else ""}
@@ -1549,7 +1567,7 @@ class Engine:
                 .limit(2000)]
 
     def queue(self):
-        return [{"pallet_id": p["pallet_id"], "po": p.get("po_name") or p.get("po_id"),
-                 "task_id": p.get("task_id"), "location": p.get("location"),
+        return [{"pallet_id": p["pallet_id"], "lpn": p.get("lpn") or p["pallet_id"],
+                 "po": p.get("po_name") or p.get("po_id"), "task_id": p.get("task_id"), "location": p.get("location"),
                  "status": p["status"], "cartons": p.get("carton_count", 0)}
                 for p in self.db.pallets.find({}).sort("seq", ASCENDING).limit(500)]

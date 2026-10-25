@@ -42,7 +42,7 @@ def main():
     out("Tra lệnh '%s' lúc %s" % (q, time.strftime("%d/%m/%Y %H:%M:%S")))
     out("Chế độ đang lưu: %s (đổi lúc %s)" % (mode.get("mode"), mode.get("at", "?")))
     rx = {"$regex": re.escape(q), "$options": "i"}
-    cond = [{"pallet_id": rx}, {"po_key": rx}, {"po_name": rx}, {"task_id": rx}]
+    cond = [{"pallet_id": rx}, {"lpn": rx}, {"po_key": rx}, {"po_name": rx}, {"task_id": rx}]
     if q.isdigit():
         cond.append({"po_id": int(q)})
     cli = MongoClient(m["uri"], serverSelectionTimeoutMS=3000)
@@ -53,12 +53,12 @@ def main():
         out("Tổng: %d lệnh đang chờ, %d lệnh lịch sử" % (d.pallets.count_documents({}),
                                                          d.pallets_his.count_documents({})))
         for p in d.pallets.find({"$or": cond}).sort("seq", 1):
-            out("  [ĐANG CHỜ] pallet=%s PO=%s status=%s nhận lúc %s%s" % (
-                p.get("pallet_id"), p.get("po_key"), p.get("status"), fmt(p.get("created_at")),
+            out("  [ĐANG CHỜ] pallet=%s LPN=%s PO=%s status=%s nhận lúc %s%s" % (
+                p.get("pallet_id"), p.get("lpn", "-"), p.get("po_key"), p.get("status"), fmt(p.get("created_at")),
                 " (WMS đã dừng)" if p.get("order_stopped") else ""))
         for p in d.pallets_his.find({"$or": cond}).sort("done_at", -1).limit(50):
-            out("  [LỊCH SỬ ] pallet=%s PO=%s status=%s lý do=%s nhận lúc %s, chuyển lúc %s, %s/%s thùng" % (
-                p.get("pallet_id"), p.get("po_key"), p.get("status"), p.get("done_reason"),
+            out("  [LỊCH SỬ ] pallet=%s LPN=%s PO=%s status=%s lý do=%s nhận lúc %s, chuyển lúc %s, %s/%s thùng" % (
+                p.get("pallet_id"), p.get("lpn", "-"), p.get("po_key"), p.get("status"), p.get("done_reason"),
                 fmt(p.get("created_at")), fmt(p.get("done_at")), p.get("carton_ok", 0),
                 p.get("carton_count", 0)))
         inbox = d.inbox.find_one({"_id": "pending"})
