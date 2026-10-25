@@ -664,6 +664,45 @@ def e2e_tests(env):
         grew = (info["pallets_his"] - db0["pallets_his"], info["parcels_his"] - db0["parcels_his"])
         assert grew == (2, 6), info
 
+    def t_shared_lpn():
+        # WCS dùng chung Pallet_ID giữ chỗ "LPN0-0-0" cho nhiều pallet cùng PO, mỗi pallet một
+        # Task_ID (log 24/10/2026): phải nhận đủ, không coi là gửi lặp; gửi lặp nhận theo Task_ID.
+        def o(n):
+            return {"Task_ID": "%d-190918952__16:08:02" % n, "PO_ID": 190918952,
+                    "PO_Name": "VAS-231026-2", "WH_Code": "WH_TB", "Line_ID": "MCSX005",
+                    "info_detail": [{"Item_Code": "TRU_G01_30W_AT", "Item_Name": "Bóng Led trụ nhôm T30",
+                                     "MFG_Date": "05/11/2026", "Pallet_ID": "LPN0-0-0",
+                                     "Location": "S02.223.1", "Ctn": 1, "Qty": 12, "Pcs": 0,
+                                     "Carton_List": ["TRU_G01_30W_AT|||||||12|0|G8HOMELPN%03d||001||||||||01" % n],
+                                     "Inner_Carton": 12, "Inner_Pallet": 1, "NW": 0.0, "GW": 1.637}],
+                    "fromSystem": "IdentifyService", "Pallet_Current": n}
+        sent = len(http(SIMU + "/sim/state")[1]["received"])
+        for x in (o(1), o(2), o(1)):                       # lần 3 = WCS gửi lặp lệnh 1
+            s, r = http(ORDER + "/ids/orderTask/", x)
+            assert (s, r["code"]) == (200, 1000), (s, r)
+        t = time.strftime("%Y-%m-%d")
+        ids = [x["pallet_id"] for x in http(APP + "/api/orders?from=%s&to=%s" % (t, t))[1]["pending"]]
+        assert len(ids) == 2 and ids[0] == "LPN0-0-0" and ids[1].startswith("LPN0-0-0#"), ids
+        if not state()["running"]:
+            start()
+        for k in range(2):
+            wait(lambda: state()["message"].startswith(("CHỜ ĐẶT", "SẴN SÀNG")), 20, "trạm chờ thùng")
+            place(1637)
+            wait(lambda: state()["message"].startswith("ĐÃ HOÀN THÀNH PALLET"), 30, "chờ ĐỊNH DANH")
+            remove()
+            assert http(APP + "/api/identify", {})[1]["ok"]
+            wait(lambda: len(http(SIMU + "/sim/state")[1]["received"]) >= sent + k + 1, 15,
+                 "gửi pallet %d" % (k + 1))
+        wait(lambda: not state()["running"], 15, "tự STOP khi hết lệnh")
+        got = http(SIMU + "/sim/state")[1]["received"][sent:]
+        assert [(g["body"]["palletID"], g["body"]["Task_ID"]) for g in got] == \
+            [("LPN0-0-0", o(1)["Task_ID"]), ("LPN0-0-0", o(2)["Task_ID"])], got
+        # WMS xác nhận theo LPN dùng chung: không nhầm sang pallet khác (đã xong cả hai).
+        s, r = http(ORDER + "/ids/confirm_product/", {"PO_ID": 190918952, "Line_ID": "MCSX005",
+                                                      "Pallet_ID": "LPN0-0-0", "Status": "true"})
+        assert s == 200, (s, r)
+        http(APP + "/api/counter/reset", {})
+
     def job_done():
         j = state()["job"]
         return j if j and not j["active"] else None
@@ -1049,6 +1088,8 @@ def e2e_tests(env):
     check("Lệnh WCS thật: GW -> chuẩn 1637 g, Pallet_Current, tem mã lệnh PO_Name", t_wcs_real_order)
     check("Lệnh 2 pallet x 3 thùng: cân-in-đọc-định danh-lưu lịch sử", t_full_order)
     check("In lại toàn bộ tem pallet từ lịch sử; máy in lỗi giữa chừng", t_reprint_history)
+    check("LPN dùng chung (LPN0-0-0) cùng PO: nhận đủ, gửi lặp theo Task_ID, gửi WMS theo LPN",
+          t_shared_lpn)
     check("Ngày sản xuất sửa tay + các nút thẻ Thông số như bản cũ", t_mfg_and_orders_tab)
     check("NG: sai khối lượng / in lỗi / đọc lại lần 2 / đọc sai 2 lần", t_ng_cases)
     check("Mất tín hiệu cân tự hồi phục; đầu đọc chờ tới khi có mã; Dừng không treo",

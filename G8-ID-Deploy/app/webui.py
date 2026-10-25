@@ -302,7 +302,7 @@ def build_ui(engine, on_quit):
     @app.post("/api/reload")
     @guard
     def reload_pallet():
-        engine.reload_pallet(str(body().get("pallet_id", "")))
+        engine.reload_pallet(str(body().get("pallet_id", "")), str(body().get("key", "") or ""))
 
     @app.post("/api/cancel")
     @guard

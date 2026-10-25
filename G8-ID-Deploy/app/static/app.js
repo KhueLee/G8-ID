@@ -428,7 +428,7 @@ async function sendIdentify() {
 async function reloadTask() {
   if (!selDone) return alertBox('Vui lòng chọn một lệnh ở bảng LỆNH ĐÃ HOÀN THÀNH.');
   if (!(await needPass()) || !(await confirmBox(`Bạn có chắc chắn muốn reload lệnh sản xuất này không?\n\nPallet_ID: ${selDone.pallet_id}\nInner_Pallet: ${selDone.inner}`, 'Thực hiện lại', 'Yes', 'No'))) return;
-  opDone(await api('/api/reload', { pallet_id: selDone.pallet_id }), 'Reload pallet từ lịch sử thành công.');
+  opDone(await api('/api/reload', { pallet_id: selDone.pallet_id, key: selDone.key }),'Reload pallet từ lịch sử thành công.');
 }
 async function loadParcels(quiet) {
   if (!quiet) {
