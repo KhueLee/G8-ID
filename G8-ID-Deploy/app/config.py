@@ -6,7 +6,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.environ.get("G8ID_CONFIG") or os.path.join(BASE_DIR, "config.json")
-VERSION = "2.4.11"
+VERSION = "2.4.12"
 
 DEFAULTS = {
     "station_id": "ST01",
@@ -23,7 +23,7 @@ DEFAULTS = {
         # auto = mỗi lần khởi động / lưu cấu hình tự tìm cổng có tên Windows chứa `detect`
         # (Device Manager → Ports); auto = false thì dùng đúng `port` đã chọn tay.
         "scale": {"auto": True, "detect": "USB Serial Port", "port": "COM4", "baudrate": 9600, "bytesize": 8, "parity": "N",
-                  "stopbits": 1, "stale_s": 2.0},
+                  "stopbits": 1, "stale_s": 2.0, "reopen_s": 10.0},
         "barcode": {"auto": True, "detect": "USB Serial Device", "port": "COM3", "baudrate": 9600, "bytesize": 8, "parity": "N",
                     "stopbits": 1},
         "printer": {"connect_type": "USB", "usb_name": "", "com_port": "COM5",
@@ -37,10 +37,7 @@ DEFAULTS = {
         "plc": {"enabled": True, "station_number": 0, "password": "", "keepalive_s": 5,
                 "progid": "", "com_port": "", "auto": True, "detect": "CH340",
                 "buttons": {"start": "M20", "stop": "M22", "identify": "M21"},
-                "button_poll_ms": 200,
-                # Mất kết nối PLC -> khởi động lại cáp CH340 của PLC (chỉ cáp ở com_port) rồi mới Open
-                # lại; Open vẫn lỗi thì lần sau (chờ 3 -> 60 s) lại khởi động lại. Cần quyền Admin.
-                "ch340_restart_on_error": True},
+                "button_poll_ms": 200},
     },
     "servers": {
         "pallet_done_url": "http://192.168.110.189:8060/identify-service/ids/pallet_identify_done",
