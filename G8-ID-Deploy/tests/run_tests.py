@@ -344,8 +344,39 @@ def t_plc_diag():
         d.diagnose_mx_failure({"stage": "open", "rc": 0x01808009, "describe": ""}, "COM12", "", None,
                               False, args, cfg)
         assert "trỏ sai cổng" in d.findings[0][1] and "COM12" in d.findings[0][2], d.findings
+        # Access denied mà handle64 không thấy ai giữ (trạm ST01, 28/10): driver CH340 kẹt, không phải bị giành.
+        real_owner = d.find_owner
+        d.find_owner = lambda kernel: ("handle", [], "No matching handles found.")
+        d.raw_test = lambda port, bauds=d.BAUDS: {9600: ("busy", "")}
+        d.findings.clear()
+        d.diagnose_mx_failure(box, "COM12", "\\Device\\Serial2", None, False, args, cfg)
+        d.find_owner = real_owner
+        assert len(d.findings) == 1 and "CH340 KẸT" in d.findings[0][1] and "không tiến trình" in d.findings[0][1], \
+            d.findings
     finally:
         plc_mx.MxPlc._create, d.raw_test = real_create, real_raw
+
+    # Cổng của Logical Station: Communication Settings Utility ghi ...\LogicalStNo_NNNN\<kiểu nối>\PortNumber.
+    import winreg
+    base = r"Software\MITSUBISHI\SWnD5-ACT\COMMUTL\LogicalStNo_0099"
+    made = []                                       # khoá cha tự tạo -> xoá lại khi xong
+    for part in (r"Software\MITSUBISHI", r"Software\MITSUBISHI\SWnD5-ACT",
+                 r"Software\MITSUBISHI\SWnD5-ACT\COMMUTL"):
+        try:
+            winreg.CloseKey(winreg.OpenKey(winreg.HKEY_CURRENT_USER, part))
+        except OSError:
+            made.append(part)
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, base + r"\STECMOPEN") as k:
+        winreg.SetValueEx(k, "PortNumber", 0, winreg.REG_DWORD, 12)
+    try:
+        num, key = d.mx_station_port(99)
+        assert num == 12 and key.endswith(r"LogicalStNo_0099\STECMOPEN"), (num, key)
+        assert d.mx_station_port(98) == (None, "")
+    finally:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, base + r"\STECMOPEN")
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, base)
+        for part in reversed(made):
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, part)
 
 
 def t_probe():

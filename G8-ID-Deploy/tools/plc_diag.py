@@ -43,6 +43,7 @@ SUSPECTS = {
     "gppw.exe": "GX Developer",
     "putty.exe": "PuTTY", "teraterm.exe": "Tera Term", "ttermpro.exe": "Tera Term",
     "hterm.exe": "HTerm", "realterm.exe": "RealTerm",
+    "vtp_induction.exe": "bản WinForms cũ (VTP_Induction)",
 }
 
 lines = []
@@ -145,45 +146,45 @@ def serialcomm():
     return res
 
 
-def mx_registry_ports():
-    """Dò (không chắc chắn) cổng COM ghi trong cấu hình MX Component ở registry."""
+def mx_station_port(station):
+    """Cổng COM của Logical Station trong registry MX Component 5. Trả (số COM, khoá) hoặc (None, "").
+
+    Communication Settings Utility ghi ở SWnD5-ACT\\COMMUTL\\LogicalStNo_NNNN\\<kiểu nối>\\PortNumber
+    (đã thấy ở trạm ST01: ...\\LogicalStNo_0000\\STECMOPEN\\PortNumber = 12).
+    """
     import winreg
-    hits = []
+    base = r"Software\MITSUBISHI\SWnD5-ACT\COMMUTL\LogicalStNo_%04d" % int(station)
 
     def walk(root, path, view, depth):
-        if depth > 6 or len(hits) > 30:
-            return
         try:
             k = winreg.OpenKey(root, path, 0, winreg.KEY_READ | view)
         except OSError:
-            return
+            return None
         with k:
+            try:
+                val = winreg.QueryValueEx(k, "PortNumber")[0]
+                if isinstance(val, int) and val > 0:
+                    return val, path
+            except OSError:
+                pass
             i = 0
-            while True:
-                try:
-                    name, val, _ = winreg.EnumValue(k, i)
-                except OSError:
-                    break
-                i += 1
-                sval = str(val)
-                if re.fullmatch(r"COM\d+", sval.strip(), re.I) or (
-                        "port" in name.lower() and isinstance(val, int) and 0 < val < 256):
-                    hits.append("%s\\%s = %s" % (path, name, sval))
-            i = 0
-            while True:
+            while depth < 3:
                 try:
                     sub = winreg.EnumKey(k, i)
                 except OSError:
                     break
                 i += 1
-                walk(root, path + "\\" + sub, view, depth + 1)
+                hit = walk(root, path + "\\" + sub, view, depth + 1)
+                if hit:
+                    return hit
+        return None
 
-    for root, rname in ((winreg.HKEY_CURRENT_USER, "HKCU"), (winreg.HKEY_LOCAL_MACHINE, "HKLM")):
+    for root, rname in ((winreg.HKEY_LOCAL_MACHINE, "HKLM"), (winreg.HKEY_CURRENT_USER, "HKCU")):
         for view in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
-            before = len(hits)
-            walk(root, r"Software\MITSUBISHI", view, 0)
-            hits[before:] = [rname + "\\" + h for h in hits[before:]]
-    return sorted(set(hits))
+            hit = walk(root, base, view, 0)
+            if hit:
+                return hit[0], rname + "\\" + hit[1]
+    return None, ""
 
 
 # ---- test cổng thô ---------------------------------------------------------------
@@ -238,7 +239,11 @@ def log_raw(port, res, prefix="T1"):
 
 
 def find_owner(kernel_name):
-    """Tiến trình đang giữ thiết bị. Ưu tiên handle64.exe (Sysinternals), không có thì đoán."""
+    """Tiến trình đang giữ thiết bị. Ưu tiên handle64.exe (Sysinternals), không có thì đoán.
+
+    Trả (cách, [tiến trình], kết quả thô của handle64 hoặc ""). handle64 không thấy ai (kể cả
+    System) mà cổng vẫn Access denied = driver CH340 kẹt ở trạng thái "đang mở".
+    """
     exe = None
     for c in (os.path.join(ROOT, "tools", "handle64.exe"), os.path.join(ROOT, "tools", "handle.exe")):
         if os.path.exists(c):
@@ -254,7 +259,8 @@ def find_owner(kernel_name):
                 m = re.match(r"\s*(\S+)\s+pid:\s*(\d+)", ln)
                 if m:
                     owners.append("%s (pid %s)" % (m.group(1), m.group(2)))
-            return "handle", sorted(set(owners))
+            raw = (r.stdout + r.stderr).strip() or "(không in gì, mã thoát %s)" % r.returncode
+            return "handle", sorted(set(owners)), raw
         except Exception as e:
             out("INFO", "Chạy %s lỗi: %s" % (exe, e))
     try:
@@ -267,7 +273,15 @@ def find_owner(kernel_name):
                                                     SUSPECTS[parts[0].lower()]))
     except Exception:
         pass
-    return "guess", owners
+    return "guess", owners, ""
+
+
+def log_owner(port, how, owners, raw, prefix="T2"):
+    out("LỖI" if owners else "INFO", "%s tiến trình giữ %s (%s): %s" % (
+        prefix, port, "handle64" if how == "handle" else
+        "đoán theo tên, chép handle64.exe vào tools\\ để chắc chắn", ", ".join(owners) or "không thấy ai"))
+    for ln in raw.splitlines()[:15]:
+        out("", "           handle64> " + ln)
 
 
 # ---- MX Component ---------------------------------------------------------------
@@ -519,15 +533,22 @@ def main():
     kernel = serialcomm().get(port, "")
     out("INFO", "Tên thiết bị nhân của %s: %s" % (port or "?", kernel or "không thấy trong SERIALCOMM"))
 
-    mx_hits = mx_registry_ports()
-    if mx_hits:
-        out("INFO", "Cổng COM tìm thấy trong registry MX Component (tham khảo, cần đối chiếu với "
-                    "Communication Settings Utility):")
-        for h in mx_hits[:15]:
-            out("INFO", "  " + h)
+    station = pcfg.get("station_number", 0)
+    st_num, st_key = mx_station_port(station)
+    if st_num is None:
+        out("INFO", "Không đọc được cổng COM của Logical Station %s từ registry - xem tay trong "
+                    "Communication Settings Utility, phải là %s" % (station, port or "cổng CH340"))
     else:
-        out("INFO", "Không đọc được cổng COM của Logical Station từ registry - xem tay trong "
-                    "Communication Settings Utility, phải là %s" % (port or "cổng CH340"))
+        st_port = "COM%d" % st_num
+        same = not port or st_port == port
+        out("OK" if same else "LỖI", "Logical Station %s trỏ %s%s (%s)" % (
+            station, st_port, "" if not port else " - khớp cáp CH340" if same else
+            " - KHÁC cáp CH340 đang ở %s" % port, st_key))
+        if not same:
+            finding("LỖI", "Logical Station %s trỏ %s nhưng cáp PLC đang ở %s" % (station, st_port, port),
+                    "Communication Settings Utility (Run as administrator) -> Logical Station %s -> "
+                    "COM port = %s, Connection test; hoặc ghim CH340 về %s ở Device Manager"
+                    % (station, port, st_port))
 
     if plc_dev and plc_dev["status"] == "OK":
         ids = [plc_dev["id"]] + parents_chain(plc_dev["id"])
@@ -551,13 +572,22 @@ def main():
         log_raw(port, raw)
         kind = summarize_raw(raw)
         if kind == "busy":
-            how, owners = find_owner(kernel)
-            out("LỖI", "T2 tiến trình giữ %s (%s): %s" % (
-                port, "handle64" if how == "handle" else "đoán theo tên, chép handle64.exe vào tools\\ để chắc chắn",
-                ", ".join(owners) or "không xác định"))
-            finding("LỖI", "Cổng %s đang bị tiến trình khác giữ: %s" % (port, ", ".join(owners) or "không rõ"),
-                    "Đóng chương trình đó (còn sót ActUtlType64.exe thì: taskkill /f /im ActUtlType64.exe) "
-                    "rồi chạy lại")
+            how, owners, raw_out = find_owner(kernel)
+            log_owner(port, how, owners, raw_out)
+            if owners:
+                finding("LỖI", "Cổng %s đang bị tiến trình khác giữ: %s" % (port, ", ".join(owners)),
+                        "Đóng chương trình đó (còn sót ActUtlType64.exe thì: taskkill /f /im "
+                        "ActUtlType64.exe) rồi chạy lại")
+            else:
+                # Không ai giữ handle mà vẫn Access denied: driver CH340 kẹt "đang mở" sau lần treo trước.
+                finding("LỖI", "%s báo bị chiếm nhưng không tiến trình nào giữ cổng%s - driver CH340 kẹt "
+                        "ở trạng thái đang mở (thường sau một lần chip treo giữa chừng)"
+                        % (port, " (handle64 xác nhận)" if how == "handle" else ""),
+                        "Tắt / bật lại CH340: tools\\restart_ch340.bat (Admin) hoặc rút cắm cáp. Bị lặp lại "
+                        "sau vài phút chạy = chip / cáp CH340 treo -> thay cáp FTDI / Mitsubishi chính hãng")
+                new_port = restart_retest(plc_dev, port, admin, args)
+                if new_port:
+                    port, kernel, kind = new_port, serialcomm().get(new_port, ""), "ok"
         elif kind == "dcb":
             finding("LỖI", "%s mở được nhưng không đặt được thông số (DCB) ngay từ đầu - CH340 / driver kẹt"
                     % port, "Rút cáp 5 s cắm lại đúng cổng cũ; không được thì tools\\reinstall_ch340.bat")
@@ -631,11 +661,19 @@ def diagnose_mx_failure(box, port, kernel, plc_dev, admin, args, pcfg):
                     "kiểm tra CPU, tốc độ bằng Connection test" % (pcfg.get("station_number", 0), port))
         return
     if kind == "busy":
-        how, owners = find_owner(kernel)
-        finding("LỖI", "Sau lỗi MX, cổng %s bị tiến trình khác giữ: %s" % (port, ", ".join(owners) or "không rõ"),
-                "Đóng chương trình đó; còn sót ActUtlType64.exe thì taskkill /f /im ActUtlType64.exe")
-        return
-    if kind == "missing":
+        how, owners, raw_out = find_owner(kernel)
+        log_owner(port, how, owners, raw_out, "T5")
+        if owners:
+            finding("LỖI", "Sau lỗi MX, cổng %s bị tiến trình khác giữ: %s" % (port, ", ".join(owners)),
+                    "Đóng chương trình đó; còn sót ActUtlType64.exe thì taskkill /f /im ActUtlType64.exe")
+            return
+        finding("LỖI", "CH340 KẸT: %s (%s), sau đó %s báo bị chiếm nhưng không tiến trình nào giữ - "
+                "driver kẹt ở trạng thái đang mở" % (
+                    "chạy được %s s rồi lỗi" % box.get("after_s") if soak else "Open lỗi",
+                    box.get("describe"), port),
+                "Chip / driver CH340 bị treo - thường do nhiễu điện hoặc cáp CH340 kém. Đi dây USB tránh "
+                "động lực, gắn ferrite, cắm cổng sau; thay cáp FTDI / Mitsubishi chính hãng")
+    elif kind == "missing":
         finding("LỖI", "Cổng %s BIẾN MẤT %s - Windows đã ngắt cáp CH340" % (
             port, "sau %s s chạy" % box.get("after_s") if soak else "khi Open"),
             "Nguồn USB / nhiễu: cắm cổng sau máy, tắt tiết kiệm điện USB, đi dây tránh động lực; "
@@ -647,29 +685,8 @@ def diagnose_mx_failure(box, port, kernel, plc_dev, admin, args, pcfg):
                 "Chip / driver CH340 bị treo - thường do nhiễu điện hoặc cáp CH340 kém. Đi dây USB tránh "
                 "động lực, gắn ferrite, cắm cổng sau; thay cáp FTDI / Mitsubishi chính hãng")
 
-    # T6: tắt / bật lại CH340 (giống rút cắm) rồi thử lại
-    if args.khong_reset or not admin or not plc_dev:
-        out("INFO", "T6 bỏ qua (%s)" % ("--khong-reset" if args.khong_reset else
-                                        "không có quyền Admin" if not admin else "không có thiết bị"))
-        return
-    out("INFO", "T6 tắt / bật lại %s ..." % plc_dev["name"])
-    if not restart_device(plc_dev["id"]):
-        out("LỖI", "T6 không tắt / bật lại được thiết bị")
-        return
-    time.sleep(5)
-    new = next((d for d in ch340_devices() if d["id"] == plc_dev["id"] and d.get("present")), None)
-    new_port = new["com"] if new else ""
-    if new_port and new_port != port:
-        out("CẢNH BÁO", "T6 số COM đổi %s -> %s" % (port, new_port))
+    new_port = restart_retest(plc_dev, port, admin, args)
     if not new_port:
-        out("LỖI", "T6 không thấy lại CH340 sau khi bật lại")
-        finding("LỖI", "Tắt / bật lại CH340 không nhận lại được", "Rút cáp cắm lại; không được thì reinstall_ch340.bat")
-        return
-    raw = raw_test(new_port)
-    log_raw(new_port, raw, "T6")
-    if summarize_raw(raw) != "ok":
-        finding("LỖI", "Tắt / bật lại CH340 không hết lỗi", "Rút cáp cắm lại; không được thì "
-                "tools\\reinstall_ch340.bat; vẫn lỗi thì thay cáp")
         return
     box2 = MxSession(pcfg).run(0, 0.2, {})
     if "error" in box2:
@@ -680,6 +697,35 @@ def diagnose_mx_failure(box, port, kernel, plc_dev, admin, args, pcfg):
         out("OK", "T6 sau khi tắt / bật lại CH340: MX Open OK")
         finding("INFO", "Tắt / bật lại CH340 là chữa được tạm thời (không cần cài lại driver)",
                 "Khi bị lại: chạy tools\\restart_ch340.bat (Admin) hoặc rút cắm cáp; sửa gốc là nhiễu / cáp")
+
+
+def restart_retest(plc_dev, port, admin, args):
+    """T6: tắt / bật lại CH340 (giống rút cắm cáp) rồi mở thử cổng. Trả cổng mới nếu mở được, không thì ""."""
+    if args.khong_reset or not admin or not plc_dev:
+        out("INFO", "T6 bỏ qua (%s)" % ("--khong-reset" if args.khong_reset else
+                                        "không có quyền Admin" if not admin else "không có thiết bị"))
+        return ""
+    out("INFO", "T6 tắt / bật lại %s ..." % plc_dev["name"])
+    if not restart_device(plc_dev["id"]):
+        out("LỖI", "T6 không tắt / bật lại được thiết bị")
+        return ""
+    time.sleep(5)
+    new = next((d for d in ch340_devices() if d["id"] == plc_dev["id"] and d.get("present")), None)
+    new_port = new["com"] if new else ""
+    if new_port and new_port != port:
+        out("CẢNH BÁO", "T6 số COM đổi %s -> %s - sửa Logical Station cho khớp" % (port, new_port))
+    if not new_port:
+        out("LỖI", "T6 không thấy lại CH340 sau khi bật lại")
+        finding("LỖI", "Tắt / bật lại CH340 không nhận lại được", "Rút cáp cắm lại; không được thì reinstall_ch340.bat")
+        return ""
+    raw = raw_test(new_port)
+    log_raw(new_port, raw, "T6")
+    if summarize_raw(raw) != "ok":
+        finding("LỖI", "Tắt / bật lại CH340 không hết lỗi", "Rút cáp cắm lại; không được thì "
+                "tools\\reinstall_ch340.bat; vẫn lỗi thì thay cáp")
+        return ""
+    out("OK", "T6 sau khi tắt / bật lại, %s mở được" % new_port)
+    return new_port
 
 
 def report(cfg):
