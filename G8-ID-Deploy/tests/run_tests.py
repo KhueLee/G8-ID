@@ -152,6 +152,7 @@ def unit_tests():
     check("Kiểm tra thiết bị ở thẻ Cài đặt: nhận ra cân / đầu đọc / sai cổng", t_probe)
     check("Tự dò cổng COM theo tên Windows (trạm ST02), thiếu / trùng -> None", t_portmap)
     check("Chẩn đoán PLC (kiem_tra_plc): phân loại lỗi cổng, chạy bền MX, kết luận CH340 kẹt", t_plc_diag)
+    check("PLC tự tắt / bật lại CH340: khi khởi động, khi Open 0x0180800C / rớt 0x01808201", t_plc_ch340)
 
 
 class FakeSerial:
@@ -379,6 +380,62 @@ def t_plc_diag():
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, part)
 
 
+def t_plc_ch340():
+    """Driver PLC với control giả + ch340.restart giả: không đụng cáp thật."""
+    from app.devices import ch340, plc_mx
+    resets, state = [], {"open": [0x0180800C, 0], "get_fail": False}
+
+    class FakeAct:
+        def Open(self):
+            return state["open"].pop(0) if state["open"] else 0
+
+        def Close(self):
+            return 0
+
+        def SetDevice(self, dev, value):
+            return 0
+
+        def GetDevice(self, dev):
+            return (0, 0x01808201) if state["get_fail"] else (0, 0)
+
+    def create(self):
+        self._ct = True
+        return FakeAct(), "control giả"
+
+    real = (plc_mx.MxPlc._create, ch340.restart, ch340.is_admin)
+    plc_mx.MxPlc._create = create
+    ch340.restart = lambda port: (resets.append(port) or True, "USB-SERIAL CH340 (%s)" % port)
+    ch340.is_admin = lambda: True
+    p = plc_mx.MxPlc({"enabled": True, "station_number": 0, "com_port": "COM12",
+                      "buttons": {"start": "M20"}, "button_poll_ms": 50,
+                      "ch340_restart_on_start": True, "ch340_restart_on_error": True})
+    p._stop.wait = lambda s=None: time.sleep(min(s or 0, 0.05))     # bỏ chờ 3 s sau khi bật lại
+    try:
+        p.start()
+        # Khởi động: bật lại 1 lần; Open 0x0180800C -> bật lại ngay rồi Open OK.
+        wait(lambda: p.connected, 5, "PLC nối sau khi bật lại CH340")
+        assert resets == ["COM12", "COM12"], resets
+        # Chạy được rồi rớt 0x01808201: lần nối trước đã OK nên bật lại ngay, không chờ khoảng cách.
+        state["get_fail"], state["open"] = True, []
+        wait(lambda: len(resets) == 3, 5, "rớt 0x01808201 -> bật lại CH340")
+        state["get_fail"] = False
+        wait(lambda: p.connected, 5, "nối lại sau khi bật lại")
+        # Bật lại xong vẫn lỗi -> lần sau phải cách CH340_GAP_S (30 s), không bật liên tục.
+        state["open"] = [0x0180800C] * 50
+        state["get_fail"] = True
+        wait(lambda: len(resets) == 4, 5, "rớt lần nữa -> bật lại")
+        time.sleep(0.5)
+        assert len(resets) == 4, "bật lại xong vẫn lỗi thì phải giãn ra: %s" % resets
+        # 0x0180840B (PLC không trả lời) không phải lỗi CH340.
+        assert 0x0180840B not in plc_mx.CH340_STUCK
+    finally:
+        p.stop()
+        plc_mx.MxPlc._create, ch340.restart, ch340.is_admin = real
+    assert ch340.pick([{"com": "COM12"}, {"com": "COM4"}], "") is None, "nhiều cáp mà không biết cổng: không đoán"
+    assert ch340.pick([{"com": "COM12"}], "")["com"] == "COM12"
+    assert ch340.pick([{"com": "COM12"}, {"com": "COM4"}], "com4")["com"] == "COM4"
+
+
 def t_probe():
     from app.devices import barcode, probe
     real = probe.open_serial
@@ -552,6 +609,8 @@ class Env:
                 "mongo": {"uri": "mongodb://127.0.0.1:%d" % MONGO},
                 "log": {"dir": os.path.join(self.dir, "logs")},
                 "servers": {"timeout_s": 3, "retry_s": 2},
+                # HYBRID mở thiết bị thật: không được tắt / bật cáp PLC của trạm đang chạy test.
+                "devices": {"plc": {"ch340_restart_on_start": False, "ch340_restart_on_error": False}},
                 "simulator": {"host": "127.0.0.1", "port": SIM}}, f)
         self.env = dict(os.environ, G8ID_CONFIG=self.cfg, G8ID_DATA=os.path.join(self.dir, "data"),
                         G8ID_NO_BROWSER="1", PYTHONUTF8="1", PYTHONUNBUFFERED="1")

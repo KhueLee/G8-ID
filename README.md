@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.6)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.7)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -176,7 +176,16 @@ chỉ đọc. Trạm nối nút vào bit khác thì sửa `buttons` trong `confi
 chuột serial. `check_env.bat` báo cổng bị nhận là *Serial Mouse*; `tools\fix_serial_mouse.bat` tắt
 dịch vụ `sermouse` (có lệnh hoàn tác trong file). Driver gốc: `drivers\CH34x_Install_Windows_v3_4.EXE`.
 
-Vẫn phải gỡ / cài lại driver sau khi bật máy (PLC báo `Open lỗi 0x0180800C` dù đúng COM): thoát
+**Cáp PLC CH340 treo** (PLC báo `0x01808201` giữa chừng rồi `Open lỗi 0x0180800C` mãi; cổng báo
+*Access denied* mà không ai giữ): G8 ID tự **tắt / bật lại** cáp CH340 của PLC – giống rút cắm, không
+gỡ driver – mỗi lần bật phần mềm và khi gặp `0x0180800C` / `0x01808009` / `0x01808201`. Bật lại xong
+vẫn lỗi thì lần sau cách 30 s, 60 s… tối đa 10 phút; nối được thì về 30 s. Cần quyền Administrator:
+`chay_dinh_danh.bat` tự xin (UAC → *Yes*); bấm *No* thì vẫn chạy nhưng không tự bật lại cáp. Log:
+`PLC: tắt / bật lại cáp CH340 COM12 - 0x0180800C`. Tắt tính năng: `devices.plc.ch340_restart_on_start`
+/ `ch340_restart_on_error` = `false`. Chỉ đụng cáp CH340 ở cổng của PLC; chưa biết cổng mà có nhiều
+cáp CH340 thì không tắt cáp nào.
+
+Vẫn phải gỡ / cài lại driver sau khi bật máy (tắt / bật lại không hết `0x0180800C`): thoát
 G8 ID, chuột phải `tools\reinstall_ch340.bat` → *Run as administrator*. Tool gỡ mọi gói
 CH341SER khỏi Driver Store, xoá các thiết bị CH340, cài lại driver 3.4 từ `drivers\CH341SER`
 (giải nén từ bộ cài gốc, chữ ký Microsoft WHQL) bằng `pnputil`, rồi in bảng cổng COM. Log ở
@@ -239,7 +248,7 @@ nút mỗi 200 ms trong 120 s như G8 ID. Lỗi giữa chừng thì thử lại 
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.6 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.7 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|

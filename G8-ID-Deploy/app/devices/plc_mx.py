@@ -59,6 +59,10 @@ ERRORS = {
     0x01808502: "không kết nối được driver USB của PLC",
     0x01808505: "USB tới PLC hết thời gian chờ",
 }
+# Mã lỗi khi cáp CH340 treo / driver kẹt (ST01 28/10: GetDevice 0x01808201 rồi Open 0x0180800C mãi)
+# -> tắt / bật lại cáp (ch340.py). 0x0180840B (PLC không trả lời) không thuộc nhóm này: cổng USB vẫn tốt.
+CH340_STUCK = (0x0180800C, 0x01808009, 0x01808201)
+CH340_GAP_S, CH340_GAP_MAX_S = 30, 600
 # Lỗi do cách gọi (không phải do đường truyền): không coi là mất kết nối.
 _CALL_SHAPE_HRESULTS = (0x80020005, 0x8002000E, 0x80020004, 0x80020003, 0x80020006)
 
@@ -116,6 +120,11 @@ class MxPlc:
                          if str(v or "").strip()}
         self._poll = max(0.05, float(cfg.get("button_poll_ms", 200) or 200) / 1000.0)
         self._edges = ButtonEdges()
+        # Tắt / bật lại CH340 khi khởi động và khi gặp lỗi CH340_STUCK (cách nhau ít nhất _reset_gap,
+        # tăng gấp đôi khi bật lại xong vẫn lỗi, về CH340_GAP_S khi nối được).
+        self._reset_on_start = bool(cfg.get("ch340_restart_on_start", False))
+        self._reset_on_error = bool(cfg.get("ch340_restart_on_error", False))
+        self._reset_gap, self._last_reset = CH340_GAP_S, 0.0
 
     def start(self):
         if not self.cfg.get("enabled", True):
@@ -258,16 +267,44 @@ class MxPlc:
                 except Exception:
                     log.exception("Lỗi xử lý nút %s từ PLC", name)
 
+    def _want_reset(self, e):
+        rc = getattr(e, "rc", None)
+        return (self._reset_on_error and rc in CH340_STUCK and not self._stop.is_set()
+                and time.time() - self._last_reset >= self._reset_gap)
+
+    def _restart_ch340(self, why):
+        """Tắt / bật lại cáp CH340 của PLC. Chạy trong luồng "plc" khi chưa Open (hoặc đã Close)."""
+        from . import ch340
+        if self._last_reset:                     # lần trước bật lại xong vẫn lỗi -> giãn ra
+            self._reset_gap = min(self._reset_gap * 2, CH340_GAP_MAX_S)
+        self._last_reset = time.time()
+        port = self.cfg.get("com_port") or ""
+        self._ok, self._error = False, "đang tắt / bật lại cáp CH340 %s (%s)" % (port, why)
+        log.warning("PLC: tắt / bật lại cáp CH340 %s - %s", port, why)
+        ok, msg = ch340.restart(port)
+        if ok:
+            log.info("PLC: đã tắt / bật lại %s", msg)
+            self._stop.wait(3)                   # chờ Windows mở lại cổng
+        else:
+            log.warning("PLC: không tắt / bật lại được CH340: %s", msg)
+            if not ch340.is_admin():             # không có quyền thì lần sau cũng vậy: thôi thử
+                self._reset_on_start = self._reset_on_error = False
+        return ok
+
     def _run(self):
         import pythoncom
         pythoncom.CoInitialize()                 # STA, theo mục 11.1 của sổ tay
         plc, backoff, last_probe, last_scan = None, 3, 0.0, 0.0
+        if self._reset_on_start:
+            self._restart_ch340("khởi động phần mềm")
+            self._last_reset = 0.0               # lỗi đầu tiên sau khởi động vẫn được bật lại ngay
         try:
             while not self._stop.is_set():
                 if plc is None:
                     try:
                         plc, self._via = self._open()
                         self._ok, self._error, self._sent, backoff = True, "", None, 3
+                        self._reset_gap, self._last_reset = CH340_GAP_S, 0.0
                         last_probe = time.time()
                         self._edges.reset()          # nối lại: lần đọc đầu chỉ ghi nhận mức nút
                         log.info("Kết nối PLC OK: %s, Logical Station %s%s", self._via,
@@ -277,6 +314,10 @@ class MxPlc:
                                  if self._buttons else "")
                     except Exception as e:
                         plc, self._ok, self._error = None, False, str(e)
+                        if self._want_reset(e):
+                            log.warning("PLC: %s", e)
+                            self._restart_ch340(describe(e.rc))
+                            continue
                         log.warning("PLC: %s - thử lại sau %d s", e, backoff)
                         self._stop.wait(backoff)
                         backoff = min(backoff * 2, 60)
@@ -303,6 +344,8 @@ class MxPlc:
                     except Exception:
                         pass
                     plc = None
+                    if self._want_reset(e):
+                        self._restart_ch340(describe(e.rc))
                     continue
                 self._wake.wait(self._poll if self._buttons else 1.0)
                 self._wake.clear()
