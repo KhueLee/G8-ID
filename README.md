@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.10)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.11)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -119,7 +119,7 @@ git stash pop
 
 | Thiết bị | Cấu hình (như bản cũ) |
 |---|---|
-| Cân | Cổng *USB Serial Port* (cáp FTDI), 9600 8N1. Quá 2 s không có số → “MẤT TÍN HIỆU CÂN”; quá 10 s → tự đóng/mở lại cổng. |
+| Cân | Cổng *USB Serial Port* (cáp FTDI), 9600 8N1. Quá 2 s không có số → “MẤT TÍN HIỆU CÂN”; cổng vẫn giữ mở, có số lại là chạy tiếp (không tự đóng / mở lại cổng); chỉ đọc cổng lỗi (rút cáp) mới mở lại. |
 | Đầu đọc Honeywell | Cổng *USB Serial Device*, 9600 8N1. Bật quét `16 54 0D`, tắt `16 55 0D`; thời gian chờ đọc mã ở thẻ Cài đặt (mặc định 5000 ms). |
 | Máy in Godex EZ520+ | USB qua `drivers\EZio64.dll`. |
 | PLC Mitsubishi | Cáp *USB-SERIAL CH340*, MX Component 5, đèn tháp M0 đỏ / M1 xanh / M2 vàng / M10 tắt. Nút trên tủ: **M20 START / M22 STOP / M21 ĐỊNH DANH** (đọc mỗi 200 ms). |
@@ -249,10 +249,11 @@ nút mỗi 200 ms trong 120 s như G8 ID. Lỗi giữa chừng thì thử lại 
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.10 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.11 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|
+| 2.4.11 | Cân: **bỏ tự đóng / mở lại cổng khi cân im lặng** (đã có ở 2.4.8, bị gỡ theo khi quay về ở 2.4.9) – im lặng thì giữ cổng, báo mất tín hiệu, ghi log một lần; chỉ đọc cổng lỗi (rút cáp) mới mở lại. |
 | 2.4.10 | PLC mất kết nối → **tự khởi động lại cáp CH340 của PLC** (`pnputil /restart-device`, chỉ cáp ở cổng PLC, không đụng cân / đầu đọc / máy in), rồi Open lại; Open lỗi thì chờ 3 → 60 s rồi lặp lại. Không khởi động lại khi bật phần mềm. `chay_dinh_danh.bat` tự xin quyền Administrator. |
 | 2.4.9 | **Quay về mã 2.4.6.** Gỡ 2.4.7 (G8 ID tự tắt / bật lại cáp PLC CH340, tự xin quyền Administrator – trạm ST01 báo `Disable-PnpDevice : Generic failure` rồi mất cả PLC, cân, đầu đọc) và 2.4.8 (biểu tượng "Chạy định danh", bỏ đóng / mở lại cổng cân). Biểu tượng Desktop đã tạo giữ nguyên, vẫn chạy được. |
 | 2.4.2 | **WMS/WCS dừng PO giữa chừng** (`cancelTask`): mở rộng từ `Task_ID` / `Pallet_ID` / `PO_ID` ra cả PO (cùng `PO_ID` hoặc `PO_Name`, vì WCS gửi mỗi pallet một `Task_ID`). Pallet chờ (`WAIT`) bị hủy – WMS chỉ gán trước, chưa sản xuất. Pallet đang làm được giữ: vẫn cân / in / đọc tiếp, nút ĐỊNH DANH (màn hình và nút trên tủ) sáng ngay, bấm lúc nào cũng được – gửi IF-03 với `Ctn` = số thùng đạt thực tế, định danh xong là hết PO; 0 thùng đạt thì chỉ đóng pallet (`CANCEL`), không gửi. Trước đây hủy luôn cả pallet đang làm, thùng đã in không được báo về server. |
