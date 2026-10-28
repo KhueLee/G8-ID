@@ -6,7 +6,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.environ.get("G8ID_CONFIG") or os.path.join(BASE_DIR, "config.json")
-VERSION = "2.4.8"
+VERSION = "2.4.9"
 
 DEFAULTS = {
     "station_id": "ST01",
@@ -23,7 +23,7 @@ DEFAULTS = {
         # auto = mỗi lần khởi động / lưu cấu hình tự tìm cổng có tên Windows chứa `detect`
         # (Device Manager → Ports); auto = false thì dùng đúng `port` đã chọn tay.
         "scale": {"auto": True, "detect": "USB Serial Port", "port": "COM4", "baudrate": 9600, "bytesize": 8, "parity": "N",
-                  "stopbits": 1, "stale_s": 2.0},
+                  "stopbits": 1, "stale_s": 2.0, "reopen_s": 10.0},
         "barcode": {"auto": True, "detect": "USB Serial Device", "port": "COM3", "baudrate": 9600, "bytesize": 8, "parity": "N",
                     "stopbits": 1},
         "printer": {"connect_type": "USB", "usb_name": "", "com_port": "COM5",
@@ -34,13 +34,10 @@ DEFAULTS = {
         # com_port = cổng COM đã đặt cho Logical Station, chỉ để thẻ Cài đặt không gán trùng.
         # buttons = bit nút vật lý trên tủ như bản cũ ("" = không dùng nút đó), đọc mỗi
         # button_poll_ms; có đọc nút thì không cần đọc thử M10.
-        # ch340_restart_on_start / _on_error = tắt / bật lại cáp CH340 của PLC khi bật phần mềm /
-        # khi cáp treo (0x0180800C, 0x01808009, 0x01808201); cần quyền Administrator.
         "plc": {"enabled": True, "station_number": 0, "password": "", "keepalive_s": 5,
                 "progid": "", "com_port": "", "auto": True, "detect": "CH340",
                 "buttons": {"start": "M20", "stop": "M22", "identify": "M21"},
-                "button_poll_ms": 200,
-                "ch340_restart_on_start": True, "ch340_restart_on_error": True},
+                "button_poll_ms": 200},
     },
     "servers": {
         "pallet_done_url": "http://192.168.110.189:8060/identify-service/ids/pallet_identify_done",

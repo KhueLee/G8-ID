@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.8)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.9)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -27,7 +27,7 @@ Làm trên từng máy trạm. Máy cần vào được github.com (lần đầu
    Administrator. File này làm hết các bước cần file bat (chạy lại nhiều lần cũng không sao):
    cài thư viện Python (`install.bat`), mở firewall cổng 8500 (`tools\open_firewall.bat`), chống
    Windows nhận nhầm cân là chuột serial (`tools\fix_serial_mouse.bat`, mục 4), tạo 2 biểu tượng
-   *Chạy định danh* / *Chạy mô phỏng* trên Desktop, hỏi có cài thời gian quét đầu đọc không
+   *Chạy phần mềm* / *Chạy mô phỏng* trên Desktop, hỏi có cài thời gian quét đầu đọc không
    (`tools\scanner_timeout.bat`), cuối cùng chạy `check_env.bat`. Xong thì **khởi động lại máy** một lần.
 5. Sửa `config.json`: `station_id`, `desk_no` (số thứ tự bàn định danh), cổng COM cân / đầu đọc,
    `pallet_done_url` (số bàn, cổng COM, máy in, PLC cũng sửa được ở thẻ **Cài đặt**, xem mục 4).
@@ -37,7 +37,7 @@ Làm trên từng máy trạm. Máy cần vào được github.com (lần đầu
    `tools\scanner_timeout.bat` một lần (mục 4); hai dòng phải `[OK]`.
 8. Tắt hẳn `VTP_Induction.exe` cũ (không dùng chung được cổng 8500 và cổng COM).
 9. Xử lý các dòng `[LỖI]` của `check_env.bat` (chạy lại được bất cứ lúc nào).
-10. **Chạy**: biểu tượng *Chạy định danh* (`chay_dinh_danh.bat`) → Chrome mở `http://127.0.0.1:8600`. Để cửa sổ đen mở (thu nhỏ).
+10. **Chạy**: biểu tượng *Chạy phần mềm* (`chay_dinh_danh.bat`) → Chrome mở `http://127.0.0.1:8600`. Để cửa sổ đen mở (thu nhỏ).
     Tự chạy khi đăng nhập Windows: đặt shortcut của `chay_dinh_danh.bat` vào `shell:startup`.
 
 MongoDB không cần cài: phần mềm tự bật `mongodb\bin\mongod.exe` (4.4), chỉ nghe ở 127.0.0.1,
@@ -89,9 +89,9 @@ git stash pop
 
 | File | Việc |
 |---|---|
-| `chay_dinh_danh.bat` | Chạy định danh + mở Chrome. Chết bất thường thì tự chạy lại sau 3 s. |
+| `chay_dinh_danh.bat` | Chạy phần mềm + mở Chrome. Chết bất thường thì tự chạy lại sau 3 s. |
 | `chay_mo_phong.bat` | Công cụ mô phỏng (`http://127.0.0.1:8700`). Chỉ chạy khi phần mềm ở **MANUAL** / **HYBRID**. |
-| `HUONG_DAN_VAN_HANH.pdf` | Hướng dẫn kỹ thuật vận hành: biểu tượng *Chạy định danh* (`chay_dinh_danh.bat`) và *Chạy mô phỏng* (`chay_mo_phong.bat`). Nguồn: `docs\huong_dan_van_hanh.py`. |
+| `HUONG_DAN_VAN_HANH.pdf` | Hướng dẫn kỹ thuật vận hành: biểu tượng *Chạy phần mềm* (`chay_dinh_danh.bat`) và *Chạy mô phỏng* (`chay_mo_phong.bat`). Nguồn: `docs\huong_dan_van_hanh.py`. |
 | `check_env.bat` | Kiểm tra máy (Python, thư viện, COM, máy in, MX Component, firewall) → `logs\check_env.txt`. |
 | `run_tests.bat` | 26 bài kiểm tra tự động (~3 phút), chạy được ngay trên máy trạm. |
 | `cai_dat_may_moi.bat` | Cài đặt máy trạm mới (mục 1, bước 4). |
@@ -119,7 +119,7 @@ git stash pop
 
 | Thiết bị | Cấu hình (như bản cũ) |
 |---|---|
-| Cân | Cổng *USB Serial Port* (cáp FTDI), 9600 8N1. Quá 2 s không có số → “MẤT TÍN HIỆU CÂN”; cổng vẫn giữ mở, có số lại là chạy tiếp (không tự đóng / mở lại cổng); chỉ đọc cổng lỗi (rút cáp) mới mở lại. |
+| Cân | Cổng *USB Serial Port* (cáp FTDI), 9600 8N1. Quá 2 s không có số → “MẤT TÍN HIỆU CÂN”; quá 10 s → tự đóng/mở lại cổng. |
 | Đầu đọc Honeywell | Cổng *USB Serial Device*, 9600 8N1. Bật quét `16 54 0D`, tắt `16 55 0D`; thời gian chờ đọc mã ở thẻ Cài đặt (mặc định 5000 ms). |
 | Máy in Godex EZ520+ | USB qua `drivers\EZio64.dll`. |
 | PLC Mitsubishi | Cáp *USB-SERIAL CH340*, MX Component 5, đèn tháp M0 đỏ / M1 xanh / M2 vàng / M10 tắt. Nút trên tủ: **M20 START / M22 STOP / M21 ĐỊNH DANH** (đọc mỗi 200 ms). |
@@ -176,16 +176,7 @@ chỉ đọc. Trạm nối nút vào bit khác thì sửa `buttons` trong `confi
 chuột serial. `check_env.bat` báo cổng bị nhận là *Serial Mouse*; `tools\fix_serial_mouse.bat` tắt
 dịch vụ `sermouse` (có lệnh hoàn tác trong file). Driver gốc: `drivers\CH34x_Install_Windows_v3_4.EXE`.
 
-**Cáp PLC CH340 treo** (PLC báo `0x01808201` giữa chừng rồi `Open lỗi 0x0180800C` mãi; cổng báo
-*Access denied* mà không ai giữ): G8 ID tự **tắt / bật lại** cáp CH340 của PLC – giống rút cắm, không
-gỡ driver – mỗi lần bật phần mềm và khi gặp `0x0180800C` / `0x01808009` / `0x01808201`. Bật lại xong
-vẫn lỗi thì lần sau cách 30 s, 60 s… tối đa 10 phút; nối được thì về 30 s. Cần quyền Administrator:
-`chay_dinh_danh.bat` tự xin (UAC → *Yes*); bấm *No* thì vẫn chạy nhưng không tự bật lại cáp. Log:
-`PLC: tắt / bật lại cáp CH340 COM12 - 0x0180800C`. Tắt tính năng: `devices.plc.ch340_restart_on_start`
-/ `ch340_restart_on_error` = `false`. Chỉ đụng cáp CH340 ở cổng của PLC; chưa biết cổng mà có nhiều
-cáp CH340 thì không tắt cáp nào.
-
-Vẫn phải gỡ / cài lại driver sau khi bật máy (tắt / bật lại không hết `0x0180800C`): thoát
+Vẫn phải gỡ / cài lại driver sau khi bật máy (PLC báo `Open lỗi 0x0180800C` dù đúng COM): thoát
 G8 ID, chuột phải `tools\reinstall_ch340.bat` → *Run as administrator*. Tool gỡ mọi gói
 CH341SER khỏi Driver Store, xoá các thiết bị CH340, cài lại driver 3.4 từ `drivers\CH341SER`
 (giải nén từ bộ cài gốc, chữ ký Microsoft WHQL) bằng `pnputil`, rồi in bảng cổng COM. Log ở
@@ -248,16 +239,11 @@ nút mỗi 200 ms trong 120 s như G8 ID. Lỗi giữa chừng thì thử lại 
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.8 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.9 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|
-| 2.4.8 | Biểu tượng Desktop **"Chạy phần mềm" đổi tên thành "Chạy định danh"** (cùng "Chạy mô phỏng"). `update.bat` tự kiểm tra 2 biểu tượng mỗi lần chạy: thiếu thì tạo, trỏ sai thư mục thì sửa, biểu tượng tên cũ thì xóa. Cân: **bỏ tự đóng / mở lại cổng khi cân im lặng** (cổng cân ổn định) – im lặng thì giữ cổng, báo mất tín hiệu, ghi log một lần; chỉ đọc cổng lỗi (rút cáp) mới mở lại. |
-| 2.4.7 | G8 ID **tự tắt / bật lại cáp PLC CH340** khi bật phần mềm và khi cáp treo (`0x0180800C` / `0x01808009` / `0x01808201`); `chay_dinh_danh.bat` tự xin quyền Administrator. |
-| 2.4.6 | `kiem_tra_plc.bat`: cổng báo bị chiếm mà không ai giữ = driver CH340 kẹt → tự tắt / bật lại rồi test tiếp; đọc đúng cổng COM của Logical Station và so với cáp. |
-| 2.4.5 | **`kiem_tra_plc.bat`** chẩn đoán kết nối PLC (cáp CH340 + MX Component): tự dò cổng, chạy test, xuất báo cáo `logs\kiem_tra_plc-*.txt`. |
-| 2.4.4 | Pallet nhận theo `Task_ID` (WCS dùng lại `Pallet_ID` giữa các pallet / PO); màn hình hiện LPN và cột Task_ID. |
-| 2.4.3 | LPN dùng chung (`LPN0-0-0`) không còn làm mất lệnh WCS; công cụ khôi phục lệnh `khoi_phuc_lenh.bat`. |
+| 2.4.9 | **Quay về mã 2.4.6.** Gỡ 2.4.7 (G8 ID tự tắt / bật lại cáp PLC CH340, tự xin quyền Administrator – trạm ST01 báo `Disable-PnpDevice : Generic failure` rồi mất cả PLC, cân, đầu đọc) và 2.4.8 (biểu tượng "Chạy định danh", bỏ đóng / mở lại cổng cân). Biểu tượng Desktop đã tạo giữ nguyên, vẫn chạy được. |
 | 2.4.2 | **WMS/WCS dừng PO giữa chừng** (`cancelTask`): mở rộng từ `Task_ID` / `Pallet_ID` / `PO_ID` ra cả PO (cùng `PO_ID` hoặc `PO_Name`, vì WCS gửi mỗi pallet một `Task_ID`). Pallet chờ (`WAIT`) bị hủy – WMS chỉ gán trước, chưa sản xuất. Pallet đang làm được giữ: vẫn cân / in / đọc tiếp, nút ĐỊNH DANH (màn hình và nút trên tủ) sáng ngay, bấm lúc nào cũng được – gửi IF-03 với `Ctn` = số thùng đạt thực tế, định danh xong là hết PO; 0 thùng đạt thì chỉ đóng pallet (`CANCEL`), không gửi. Trước đây hủy luôn cả pallet đang làm, thùng đã in không được báo về server. |
 | 2.4.1 | **Nút vật lý trên tủ qua PLC** như bản cũ: M20 = START, M22 = STOP, M21 = ĐỊNH DANH, quét 200 ms, kích ở sườn lên (giữ nút không lặp, bit đang 1 lúc nối PLC không tự Bắt đầu). Làm đúng việc của nút trên màn hình; lỗi hiện ở dải thông báo. Địa chỉ bit sửa được ở `devices.plc.buttons`. Công cụ mô phỏng có 3 nút giả lập trong ô PLC. |
 | 2.4.0 | Lệnh WCS: đọc **`GW`** (kg / thùng, vd. `1.637`) đổi ra gam (1637 g) làm khối lượng chuẩn khi cân – trước đây chỉ đọc `Weight_ref` nên lệnh WCS thật luôn cân theo cài đặt trạm (300 g); `Weight_ref` (gam) vẫn nhận và dùng trước `GW`. `Pallet_Current` lấy ở cấp lệnh (đúng bản tin WCS), không có mới tìm trong `info_detail`; hiện ở thẻ Thông số cùng khối lượng chuẩn. Ngày sản xuất: sửa tay được cả khi lệnh đã có thùng đạt – áp dụng từ thùng in tiếp theo trở đi cho mọi pallet còn lại của lệnh, tem đã in giữ ngày cũ (lệnh làm qua nhiều ngày). Tem: dòng **"Mã lệnh"** in `PO_Name` (vd. `VAS-091026-3`, thiếu thì `PO_ID`) thay cho `WH_Code`; nhãn tiếng Việt có dấu ("Quy cách : 6 chiếc", "Mã lệnh", "NSX"), dữ liệu từ lệnh in nguyên như WCS gửi. Trang *In PDF mã hiện tại* in giống vậy. |

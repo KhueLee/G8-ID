@@ -47,13 +47,9 @@ if errorlevel 1 (
   call "%~dp0install.bat" nopause
 )
 echo.
-echo [OK] Da cap nhat. Nhap dup "Chay dinh danh" tren Desktop de chay ban moi.
+echo [OK] Da cap nhat. Nhap dup "Chay phan mem" de chay ban moi.
 
 :done
-rem Chi sua tu day tro xuong: git pull ghi de file nay khi dang chay, cmd doc tiep theo vi tri cu.
-echo.
-echo Kiem tra bieu tuong tren Desktop...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\tao_shortcut.ps1" -Root "%~dp0."
 echo.
 pause
 exit /b 0
