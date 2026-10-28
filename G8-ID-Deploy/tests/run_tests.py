@@ -144,7 +144,7 @@ def unit_tests():
     check("Tem: QR + dòng cuối là nguyên phần tử Carton_List, vừa khung", t_label_code)
     check("Tách mã thùng từ Carton_List", t_carton)
     check("Đọc trường không phân biệt hoa thường", t_field)
-    check("Driver cân RS232: đọc luồng, mất tín hiệu, tự mở lại cổng, đóng sạch", t_serial_scale)
+    check("Driver cân RS232: đọc luồng, mất tín hiệu giữ cổng, đọc lỗi mở lại, đóng sạch", t_serial_scale)
     check("Driver đầu đọc RS232: kích 16 54 0D / tắt 16 55 0D, hết giờ, Dừng", t_serial_barcode)
     check("Driver máy in: nạp được EZio DLL của bản cũ", t_printer_dll)
     check("Driver PLC MX Component (control giả): Open, đèn, nút M20/M22/M21, mất nối, Close", t_plc_mx)
@@ -197,12 +197,16 @@ def t_serial_scale():
 
     scale.open_serial = fake_open
     try:
-        s = scale.SerialScale({"port": "COMX", "baudrate": 9600, "stale_s": 0.4, "reopen_s": 0.8})
+        s = scale.SerialScale({"port": "COMX", "baudrate": 9600, "stale_s": 0.4})
         s.start()
         wait(lambda: s.read() == 305, 3, "đọc được 305 g")
         wait(lambda: s.read() is None, 3, "hết dữ liệu -> báo mất cân, không dùng số cũ")
-        wait(lambda: len(ports) >= 2, 5, "tự đóng/mở lại cổng khi cân im lặng")
-        assert ports[0].closed, "cổng cũ phải được đóng trước khi mở lại"
+        time.sleep(1.5)
+        assert len(ports) == 1 and not ports[0].closed, "cân im lặng: giữ cổng, không đóng/mở lại"
+        ports[0].feed.append(b"ST,GS,+  0.310kg\r\n")
+        wait(lambda: s.read() == 310, 3, "có lại dữ liệu trên cổng cũ")
+        ports[0].closed = True                          # đọc lỗi (rút cáp) -> vẫn phải mở lại
+        wait(lambda: len(ports) == 2, 5, "đọc cổng lỗi thì đóng rồi mở lại")
         wait(lambda: s.read() == 305, 3, "có lại dữ liệu sau khi mở lại")
         t0 = time.time()
         s.stop()

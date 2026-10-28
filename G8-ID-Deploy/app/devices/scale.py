@@ -3,8 +3,9 @@
 Khác bản cũ:
   - Một luồng đọc riêng có timeout, không dùng sự kiện DataReceived (nguyên nhân treo khi
     đóng cổng ở bản WinForms) -> đóng cổng luôn trả về trong < 1 s.
-  - Quá stale_s không có dòng mới => coi như MẤT CÂN (không dùng lại số cũ).
-  - Quá reopen_s không có dữ liệu => tự đóng/mở lại cổng; mở lỗi thì thử lại, lùi dần 3->30 s.
+  - Quá stale_s không có dòng mới => coi như MẤT CÂN (không dùng lại số cũ). Cân im lặng thì vẫn
+    giữ cổng mở, chờ dữ liệu (bản 2.4.8 bỏ việc tự đóng/mở lại cổng khi im lặng - cổng cân ổn định).
+  - Chỉ khi đọc cổng LỖI (rút cáp...) mới đóng rồi mở lại; mở lỗi thì thử lại, lùi dần 3->30 s.
 """
 import logging
 import re
@@ -16,6 +17,7 @@ import serial
 log = logging.getLogger("device.scale")
 raw_log = logging.getLogger("raw.scale")
 
+SILENT_LOG_S = 10                        # im lặng quá ngần này thì ghi log một lần
 _NUM = re.compile(r"[-+]?\s*\d+(?:\.\d+)?")
 
 
@@ -77,6 +79,7 @@ class SerialScale:
             return
         backoff = 3
         buf = b""
+        silent = False                           # đã ghi log "cân im lặng" cho đợt im lặng này
         while not self._stop.is_set():
             if self._ser is None:
                 try:
@@ -108,13 +111,17 @@ class SerialScale:
                 for p in parts:
                     w = parse_weight(p.decode("ascii", "ignore"))
                     if w is not None:
+                        if silent:
+                            log.info("Cân có lại dữ liệu sau %.0f s", time.time() - max(self._last_rx, self._opened_at))
+                            silent = False
                         self._weight, self._last_rx, self._error = w, time.time(), ""
             else:
                 idle = time.time() - max(self._last_rx, self._opened_at)
-                if idle > float(self.cfg.get("reopen_s", 10)):
+                if idle > float(self.cfg.get("stale_s", 2.0)):
                     self._error = f"không có dữ liệu {idle:.0f} s"
-                    log.warning("Cân im lặng %.0f s - đóng/mở lại cổng %s", idle, self.cfg["port"])
-                    self._close()
+                    if not silent and idle > SILENT_LOG_S:
+                        silent = True
+                        log.warning("Cân im lặng %.0f s - giữ cổng %s, chờ dữ liệu", idle, self.cfg["port"])
 
     @property
     def connected(self):

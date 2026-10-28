@@ -4,7 +4,7 @@ rem ---------------------------------------------------------------------------
 rem CAI DAT MAY TRAM MOI - chay MOT LAN sau khi da cai Python 3.13 64-bit (tick "Add python.exe to PATH").
 rem Gom cac buoc can quyen Administrator: thu vien Python, firewall 8500, tat chuot serial,
 rem tao 2 bieu tuong tren Desktop, (tuy chon) cai thoi gian quet dau doc, kiem tra may.
-rem Chay lai nhieu lan cung khong sao. Xong thi mo "Chay phan mem" (chay_dinh_danh.bat).
+rem Chay lai nhieu lan cung khong sao. Xong thi mo "Chay dinh danh" (chay_dinh_danh.bat).
 rem ---------------------------------------------------------------------------
 title CAI DAT MAY TRAM MOI - G8 ID
 
@@ -73,7 +73,7 @@ if "%ERR%"=="1" (
 echo  - Can KHOI DONG LAI MAY mot lan de tat chuot serial co hieu luc.
 echo  - Viec lam tay: sua station_id / cong COM / pallet_done_url ^(config.json hoac the Cai dat^),
 echo    cai MX Component 5 + Logical Station cho PLC, tat VTP_Induction.exe cu.
-echo  - Sau do nhap dup "Chay phan mem" tren Desktop.
+echo  - Sau do nhap dup "Chay dinh danh" tren Desktop.
 echo ---------------------------------------------------------------------------
 pause
 exit /b 0

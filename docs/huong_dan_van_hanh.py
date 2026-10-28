@@ -1,5 +1,5 @@
 """Tạo G8-ID-Deploy/HUONG_DAN_VAN_HANH.pdf - hướng dẫn kỹ thuật vận hành dùng 2 biểu tượng
-"Chạy phần mềm" (chay_dinh_danh.bat) và "Chạy mô phỏng" (chay_mo_phong.bat).
+"Chạy định danh" (chay_dinh_danh.bat) và "Chạy mô phỏng" (chay_mo_phong.bat).
 
 Chạy: python docs/huong_dan_van_hanh.py   (cần reportlab; font Arial của Windows)
 """
@@ -131,7 +131,7 @@ def on_page(canvas, doc):
     canvas.saveState()
     canvas.setFont("Arial", 8.5)
     canvas.setFillColor(MUTED)
-    canvas.drawString(18 * mm, 10 * mm, "G8 ID – Hướng dẫn vận hành: Chạy phần mềm & Chạy mô phỏng")
+    canvas.drawString(18 * mm, 10 * mm, "G8 ID – Hướng dẫn vận hành: Chạy định danh & Chạy mô phỏng")
     canvas.drawRightString(192 * mm, 10 * mm, "Trang %d" % doc.page)
     canvas.setStrokeColor(LINE)
     canvas.line(18 * mm, 13 * mm, 192 * mm, 13 * mm)
@@ -148,7 +148,7 @@ def build():
           Spacer(1, 10)]
     s += table([
         ["Biểu tượng trên Desktop", "Mở file", "Dùng khi nào"],
-        ["<b>Chạy phần mềm</b>", "chay_dinh_danh.bat",
+        ["<b>Chạy định danh</b>", "chay_dinh_danh.bat",
          "Mỗi ca / mỗi lần bật máy. Đây là phần mềm định danh dùng cho <b>sản xuất thật</b>."],
         ["<b>Chạy mô phỏng</b>", "chay_mo_phong.bat",
          "Chỉ khi <b>chạy thử / kiểm tra</b>: giả lập hệ thống gửi lệnh (WMS/WCS), server nhận "
@@ -162,7 +162,7 @@ def build():
               "không sản xuất.",
               "3. Muốn về AUTO phải <b>đóng hẳn</b> cửa sổ đen của \u201cChạy mô phỏng\u201d trước."])
     s += [P("Mục lục", h2)]
-    s += bullets(["<b>Phần A – Chạy phần mềm</b>: mở, đọc màn hình, quy trình sản xuất, xử lý "
+    s += bullets(["<b>Phần A – Chạy định danh</b>: mở, đọc màn hình, quy trình sản xuất, xử lý "
                   "thông báo, đổi chế độ, ngày sản xuất, tắt phần mềm, cập nhật phần mềm, thẻ Thông số.",
                   "<b>Phần B – Chạy mô phỏng</b>: chuẩn bị, các ô trên công cụ, chạy thử MANUAL, "
                   "chạy thử HYBRID, trở về sản xuất.",
@@ -173,14 +173,14 @@ def build():
     s += section("PHẦN A – CHẠY PHẦN MỀM", BRAND)
     s += [P("A1. Mở phần mềm", h2)]
     s += steps([
-        "Nhấp đúp biểu tượng <b>Chạy phần mềm</b> trên Desktop.",
+        "Nhấp đúp biểu tượng <b>Chạy định danh</b> trên Desktop.",
         "Một cửa sổ đen hiện ra, dòng đầu màu xanh lá ghi <b>PHẦN MỀM ĐỊNH DANH SẢN PHẨM</b>. "
         "Bấm nút <b>_</b> để thu nhỏ, <b>không bấm X</b>.",
         "Sau vài giây Chrome tự mở màn hình định danh (địa chỉ <b>http://127.0.0.1:8600</b>).",
         "Chờ các chỉ báo trên thanh đầu chuyển <font color='#1e8a1e'><b>chữ xanh</b></font> "
         "(mục A2). PLC thường xanh chậm hơn vài giây.",
     ])
-    s += box(["<b>Lỡ tắt Chrome?</b> Nhấp đúp <b>Chạy phần mềm</b> lần nữa – phần mềm vẫn đang chạy "
+    s += box(["<b>Lỡ tắt Chrome?</b> Nhấp đúp <b>Chạy định danh</b> lần nữa – phần mềm vẫn đang chạy "
               "nên chỉ mở lại màn hình, không mất dữ liệu.",
               "<b>Phần mềm bị lỗi giữa chừng?</b> Cửa sổ đen tự khởi động lại sau 3 giây; tiến độ "
               "lệnh vẫn còn nguyên (kể cả khi mất điện)."], SOFT, BRAND)
@@ -410,8 +410,10 @@ def build():
         "<b>[DUNG] Phan mem dinh danh dang chay</b> và không cập nhật.",
         "Mở thư mục phần mềm (thư mục có chay_dinh_danh.bat), nhấp đúp <b>update.bat</b>.",
         "Chờ dòng <b>[OK] Da cap nhat</b> (kèm danh sách thay đổi) hoặc "
-        "<b>Da la ban moi nhat</b>. Bấm phím bất kỳ để đóng.",
-        "Nhấp đúp <b>Chạy phần mềm</b> để chạy bản mới.",
+        "<b>Da la ban moi nhat</b>. update.bat tự kiểm tra 2 biểu tượng <b>Chạy định danh</b> / "
+        "<b>Chạy mô phỏng</b> trên Desktop: thiếu thì tạo, trỏ sai thư mục thì sửa, biểu tượng tên cũ "
+        "<i>Chạy phần mềm</i> thì xóa. Bấm phím bất kỳ để đóng.",
+        "Nhấp đúp <b>Chạy định danh</b> để chạy bản mới (hỏi quyền Administrator: bấm <b>Yes</b>).",
     ])
     s += box(["Thông số trong thẻ Cài đặt và dữ liệu sản xuất <b>không bị ảnh hưởng</b> khi cập nhật.",
               "Kiểm tra đã lên bản mới: số phiên bản ở góc đồng hồ trên thanh đầu "
@@ -451,7 +453,7 @@ def build():
               "đang ở <b>MANUAL</b> hoặc <b>HYBRID</b>, và tự tắt ngay khi phần mềm chuyển về AUTO."])
     s += [P("B1. Chuẩn bị và mở", h2)]
     s += steps([
-        "Mở <b>Chạy phần mềm</b> trước (Phần A1).",
+        "Mở <b>Chạy định danh</b> trước (Phần A1).",
         "Đổi sang <b>MANUAL</b> hoặc <b>HYBRID</b> (mục A6). Màn hình chính hiện dải vàng.",
         "Nhấp đúp <b>Chạy mô phỏng</b>. Một cửa sổ đen thứ hai mở ra, dòng đầu màu xanh lá ghi "
         "<b>PHẦN MỀM MÔ PHỎNG ĐỊNH DANH</b> (để nguyên, thu nhỏ) và "
@@ -549,7 +551,7 @@ def main():
     doc = SimpleDocTemplate(OUT, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm,
                             topMargin=16 * mm, bottomMargin=18 * mm,
                             title="Hướng dẫn vận hành G8 ID", author="G8 ID",
-                            subject="Chạy phần mềm và Chạy mô phỏng")
+                            subject="Chạy định danh và Chạy mô phỏng")
     doc.build(build(), onFirstPage=on_page, onLaterPages=on_page)
     print(OUT)
 

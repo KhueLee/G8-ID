@@ -6,7 +6,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.environ.get("G8ID_CONFIG") or os.path.join(BASE_DIR, "config.json")
-VERSION = "2.4.7"
+VERSION = "2.4.8"
 
 DEFAULTS = {
     "station_id": "ST01",
@@ -23,7 +23,7 @@ DEFAULTS = {
         # auto = mỗi lần khởi động / lưu cấu hình tự tìm cổng có tên Windows chứa `detect`
         # (Device Manager → Ports); auto = false thì dùng đúng `port` đã chọn tay.
         "scale": {"auto": True, "detect": "USB Serial Port", "port": "COM4", "baudrate": 9600, "bytesize": 8, "parity": "N",
-                  "stopbits": 1, "stale_s": 2.0, "reopen_s": 10.0},
+                  "stopbits": 1, "stale_s": 2.0},
         "barcode": {"auto": True, "detect": "USB Serial Device", "port": "COM3", "baudrate": 9600, "bytesize": 8, "parity": "N",
                     "stopbits": 1},
         "printer": {"connect_type": "USB", "usb_name": "", "com_port": "COM5",
