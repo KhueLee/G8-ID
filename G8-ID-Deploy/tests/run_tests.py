@@ -151,6 +151,7 @@ def unit_tests():
     check("Cổng COM: None không mở cổng, chặn hai thiết bị trùng cổng", t_com_none_conflict)
     check("Kiểm tra thiết bị ở thẻ Cài đặt: nhận ra cân / đầu đọc / sai cổng", t_probe)
     check("Tự dò cổng COM theo tên Windows (trạm ST02), thiếu / trùng -> None", t_portmap)
+    check("Chẩn đoán PLC (kiem_tra_plc): phân loại lỗi cổng, chạy bền MX, kết luận CH340 kẹt", t_plc_diag)
 
 
 class FakeSerial:
@@ -289,6 +290,62 @@ def t_portmap():
     assert got["scale"][0] == "" and "COM5, COM7" in got["scale"][1], got
     dev["plc"]["enabled"] = False
     assert "plc" not in portmap.detect(dev, st02), "PLC tắt thì không dò"
+
+
+def t_plc_diag():
+    """tools/plc_diag.py với control MX giả và cổng thô giả: không cần cáp / MX Component."""
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import argparse
+    import plc_diag as d
+    from app.devices import plc_mx
+    c = d.classify_serial_error
+    assert c(Exception("could not open port 'COM9': PermissionError(13, 'Access is denied.', None, 5)"))[0] == "busy"
+    assert c(Exception("could not open port 'COM9': FileNotFoundError(2, 'The system cannot find "
+                       "the file specified.', None, 2)"))[0] == "missing"
+    assert c(Exception("Cannot configure port, something went wrong. Original message: OSError(22, "
+                       "'A device attached to the system is not functioning.', None, 31)"))[0] == "dcb"
+    assert d.summarize_raw({9600: ("ok", ""), 115200: ("dcb", "")}) == "dcb"
+
+    class FakeMx:
+        reads = 0
+        fail_after = 10**9
+
+        def Open(self):
+            return 0
+
+        def Close(self):
+            return 0
+
+        def GetDevice(self, dev):
+            FakeMx.reads += 1
+            return (0, 0x01808201) if FakeMx.reads > FakeMx.fail_after else (0, 0)
+
+    def create(self):
+        self._ct = True
+        return FakeMx(), "control giả"
+
+    real_create, real_raw = plc_mx.MxPlc._create, d.raw_test
+    plc_mx.MxPlc._create = create
+    try:
+        cfg = {"enabled": True, "station_number": 0}
+        btn = {"start": "M20", "stop": "M22"}
+        box = d.MxSession(cfg).run(1, 0.05, btn)
+        assert "error" not in box and box["soak_ok_s"] == 1 and box["reads"] > 4, box
+        FakeMx.reads, FakeMx.fail_after = 0, 7                 # chạy được một lúc rồi lỗi gửi
+        box = d.MxSession(cfg).run(5, 0.05, btn)
+        assert box["stage"] == "soak" and box["rc"] == 0x01808201 and "after_s" in box, box
+        d.raw_test = lambda port, bauds=d.BAUDS: {9600: ("dcb", "kẹt")}
+        d.findings.clear()
+        args = argparse.Namespace(khong_reset=True)
+        d.diagnose_mx_failure(box, "COM12", "", None, False, args, cfg)
+        assert len(d.findings) == 1 and "CH340 KẸT" in d.findings[0][1], d.findings
+        d.raw_test = lambda port, bauds=d.BAUDS: {9600: ("ok", "")}   # cổng tốt, MX báo không mở được
+        d.findings.clear()
+        d.diagnose_mx_failure({"stage": "open", "rc": 0x01808009, "describe": ""}, "COM12", "", None,
+                              False, args, cfg)
+        assert "trỏ sai cổng" in d.findings[0][1] and "COM12" in d.findings[0][2], d.findings
+    finally:
+        plc_mx.MxPlc._create, d.raw_test = real_create, real_raw
 
 
 def t_probe():

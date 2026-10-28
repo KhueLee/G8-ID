@@ -183,6 +183,14 @@ CH341SER khỏi Driver Store, xoá các thiết bị CH340, cài lại driver 3.
 `logs\reinstall_ch340-*.log`. Kiểm tra số COM vẫn khớp `config.json` và Logical Station của MX
 Component rồi mở lại `chay_dinh_danh.bat`.
 
+**Chẩn đoán PLC tự động** – `kiem_tra_plc.bat` (thoát G8 ID trước, chuột phải → *Run as
+administrator*): tự tìm cổng của cáp CH340, kiểm tra tiết kiệm điện USB và các bản ghi CH340 cũ,
+mở cổng thô (pyserial) để phân biệt *bị chiếm* / *không có* / *kẹt DCB*, Open MX Component, đọc
+nút mỗi 200 ms trong 120 s như G8 ID. Lỗi giữa chừng thì thử lại cổng thô, tắt / bật lại CH340 và
+đọc sự kiện Kernel-PnP để kết luận. Báo cáo ở `logs\kiem_tra_plc-*.txt`. Chạy lâu hơn:
+`kiem_tra_plc.bat --giay 900`. Chép `handle64.exe` (Sysinternals) vào `tools\` thì tool chỉ ra
+đúng tiến trình đang giữ cổng.
+
 ## 5. Log – gửi kèm khi cần hỗ trợ
 
 `logs\`, mỗi ngày một file, giữ 30 ngày (`log.keep_days`). Xem / lọc được ở thẻ **Lịch sử Log**.
