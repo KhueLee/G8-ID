@@ -1,4 +1,4 @@
-# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.9)
+# G8 ID – Trạm định danh thùng / pallet (Python + MongoDB, v2.4.10)
 
 Thay cho phần mềm WinForms `VTP_Induction.exe`: giữ nguyên quy trình, thông báo, bố cục màn hình
 và driver thiết bị của bản cũ; giao diện chạy trên Google Chrome. Phần mềm nằm trong thư mục
@@ -176,6 +176,16 @@ chỉ đọc. Trạm nối nút vào bit khác thì sửa `buttons` trong `confi
 chuột serial. `check_env.bat` báo cổng bị nhận là *Serial Mouse*; `tools\fix_serial_mouse.bat` tắt
 dịch vụ `sermouse` (có lệnh hoàn tác trong file). Driver gốc: `drivers\CH34x_Install_Windows_v3_4.EXE`.
 
+**PLC mất kết nối → tự khởi động lại cáp CH340 của PLC** (giống rút cắm, không gỡ driver). Không làm
+khi bật phần mềm, chỉ khi PLC lỗi: đang chạy mà rớt (đã nối ổn ≥ 10 s) thì khởi động lại ngay rồi Open;
+Open vẫn lỗi thì chờ 3 → 6 → … 60 s, mỗi lần lại khởi động lại rồi Open. Vừa nối đã rớt thì cũng chờ lùi
+dần. Chỉ đụng **đúng một thiết bị**: cáp CH340 có số COM bằng `devices.plc.com_port`; chưa biết cổng PLC,
+cổng PLC trùng cổng cân / đầu đọc / máy in, hoặc không thấy cáp đó thì không làm gì. Lệnh:
+`pnputil /restart-device` (một lệnh, không để thiết bị ở trạng thái "đã tắt"). Cần quyền Administrator:
+`chay_dinh_danh.bat` tự xin (UAC → *Yes*); bấm *No* thì vẫn chạy, chỉ không khởi động lại cáp. Log:
+`PLC: đã khởi động lại cáp USB-SERIAL CH340 (COM12)` hoặc `PLC: không khởi động lại được cáp CH340: …`
+(lý do ghi một lần). Tắt: `devices.plc.ch340_restart_on_error = false`.
+
 Vẫn phải gỡ / cài lại driver sau khi bật máy (PLC báo `Open lỗi 0x0180800C` dù đúng COM): thoát
 G8 ID, chuột phải `tools\reinstall_ch340.bat` → *Run as administrator*. Tool gỡ mọi gói
 CH341SER khỏi Driver Store, xoá các thiết bị CH340, cài lại driver 3.4 từ `drivers\CH341SER`
@@ -239,10 +249,11 @@ nút mỗi 200 ms trong 120 s như G8 ID. Lỗi giữa chừng thì thử lại 
 ## 9. Phiên bản
 
 Số phiên bản (`VERSION` trong `app\config.py`) tăng mỗi lần cập nhật phần mềm. Xem bản đang chạy ở góc
-đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.9 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
+đồng hồ trên thanh đầu (`dd/mm/yyyy · v2.4.10 · ST02 · Bàn 1 · AUTO`) hoặc thẻ Cài đặt → *Thông tin trạm*.
 
 | Bản | Thay đổi |
 |---|---|
+| 2.4.10 | PLC mất kết nối → **tự khởi động lại cáp CH340 của PLC** (`pnputil /restart-device`, chỉ cáp ở cổng PLC, không đụng cân / đầu đọc / máy in), rồi Open lại; Open lỗi thì chờ 3 → 60 s rồi lặp lại. Không khởi động lại khi bật phần mềm. `chay_dinh_danh.bat` tự xin quyền Administrator. |
 | 2.4.9 | **Quay về mã 2.4.6.** Gỡ 2.4.7 (G8 ID tự tắt / bật lại cáp PLC CH340, tự xin quyền Administrator – trạm ST01 báo `Disable-PnpDevice : Generic failure` rồi mất cả PLC, cân, đầu đọc) và 2.4.8 (biểu tượng "Chạy định danh", bỏ đóng / mở lại cổng cân). Biểu tượng Desktop đã tạo giữ nguyên, vẫn chạy được. |
 | 2.4.2 | **WMS/WCS dừng PO giữa chừng** (`cancelTask`): mở rộng từ `Task_ID` / `Pallet_ID` / `PO_ID` ra cả PO (cùng `PO_ID` hoặc `PO_Name`, vì WCS gửi mỗi pallet một `Task_ID`). Pallet chờ (`WAIT`) bị hủy – WMS chỉ gán trước, chưa sản xuất. Pallet đang làm được giữ: vẫn cân / in / đọc tiếp, nút ĐỊNH DANH (màn hình và nút trên tủ) sáng ngay, bấm lúc nào cũng được – gửi IF-03 với `Ctn` = số thùng đạt thực tế, định danh xong là hết PO; 0 thùng đạt thì chỉ đóng pallet (`CANCEL`), không gửi. Trước đây hủy luôn cả pallet đang làm, thùng đã in không được báo về server. |
 | 2.4.1 | **Nút vật lý trên tủ qua PLC** như bản cũ: M20 = START, M22 = STOP, M21 = ĐỊNH DANH, quét 200 ms, kích ở sườn lên (giữ nút không lặp, bit đang 1 lúc nối PLC không tự Bắt đầu). Làm đúng việc của nút trên màn hình; lỗi hiện ở dải thông báo. Địa chỉ bit sửa được ở `devices.plc.buttons`. Công cụ mô phỏng có 3 nút giả lập trong ô PLC. |

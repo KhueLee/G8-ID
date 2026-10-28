@@ -152,6 +152,7 @@ def unit_tests():
     check("Kiểm tra thiết bị ở thẻ Cài đặt: nhận ra cân / đầu đọc / sai cổng", t_probe)
     check("Tự dò cổng COM theo tên Windows (trạm ST02), thiếu / trùng -> None", t_portmap)
     check("Chẩn đoán PLC (kiem_tra_plc): phân loại lỗi cổng, chạy bền MX, kết luận CH340 kẹt", t_plc_diag)
+    check("PLC mất kết nối -> khởi động lại đúng cáp CH340 của PLC (không khi khởi động)", t_plc_ch340)
 
 
 class FakeSerial:
@@ -379,6 +380,103 @@ def t_plc_diag():
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, part)
 
 
+def t_plc_ch340():
+    """Driver PLC với control giả + ch340.restart giả: không đụng cáp thật."""
+    from app.devices import ch340, plc_mx
+    resets, state = [], {"open": [], "get_fail": False, "restart": (True, "USB-SERIAL CH340 (COM12)")}
+
+    class FakeAct:
+        def Open(self):
+            return state["open"].pop(0) if state["open"] else 0
+
+        def Close(self):
+            return 0
+
+        def SetDevice(self, dev, value):
+            return 0
+
+        def GetDevice(self, dev):
+            return (0, 0x01808201) if state["get_fail"] else (0, 0)
+
+    def create(self):
+        self._ct = True
+        return FakeAct(), "control giả"
+
+    def fake_restart(port, others):
+        resets.append((port, list(others)))
+        return state["restart"]
+
+    real = (plc_mx.MxPlc._create, ch340.restart)
+    plc_mx.MxPlc._create = create
+    ch340.restart = fake_restart
+    p = plc_mx.MxPlc({"enabled": True, "station_number": 0, "com_port": "COM12",
+                      "buttons": {"start": "M20"}, "button_poll_ms": 50, "ch340_restart_on_error": True},
+                     lambda: ["COM5", "COM3"])
+    waits = []
+    p._stop.wait = lambda s=None: (waits.append(s), time.sleep(0.02))[1]    # bỏ chờ thật, ghi lại số giây
+    try:
+        p.start()
+        wait(lambda: p.connected, 5, "PLC nối")
+        assert resets == [], "khởi động phần mềm không được khởi động lại cáp: %s" % resets
+        # Đang chạy thì rớt 0x01808201 -> khởi động lại cáp NGAY rồi Open lại, chỉ cổng PLC.
+        plc_mx.STABLE_S = 0                                 # coi như đã chạy ổn lâu
+        state["get_fail"], state["open"] = True, [0x0180800C]
+        wait(lambda: len(resets) >= 1, 5, "mất kết nối -> khởi động lại cáp")
+        assert resets[0] == ("COM12", ["COM5", "COM3"]), resets
+        assert waits[0] == 2, "đã chạy ổn mà rớt thì khởi động lại ngay (chỉ chờ 2 s cổng mở lại): %s" % waits
+        # Open sau khi khởi động lại vẫn lỗi -> chờ 3 s rồi mới khởi động lại tiếp, không dồn dập.
+        wait(lambda: len(resets) >= 2, 5, "Open lỗi -> chờ rồi khởi động lại tiếp")
+        assert 3 in waits, "phải chờ 3 s trước lần khởi động lại thứ hai: %s" % waits
+        state["get_fail"] = False
+        wait(lambda: p.connected, 5, "nối lại được")
+        # Vừa nối đã rớt (chưa đủ STABLE_S) -> cũng phải chờ lùi dần trước khi khởi động lại.
+        plc_mx.STABLE_S = 999
+        waits.clear()
+        n = len(resets)
+        state["get_fail"] = True
+        wait(lambda: len(resets) > n, 5, "rớt sớm -> chờ rồi khởi động lại")
+        assert waits and waits[0] >= 3, "rớt sớm phải chờ lùi dần (>= 3 s) trước khi khởi động lại: %s" % waits
+        state["get_fail"] = False
+        wait(lambda: p.connected, 5, "nối lại được")
+        n = len(resets)
+        time.sleep(0.3)
+        assert len(resets) == n, "đang nối tốt thì không khởi động lại"
+    finally:
+        p.stop()
+        plc_mx.MxPlc._create, ch340.restart = real
+        plc_mx.STABLE_S = 10
+
+    # Không tạo được control (chưa cài MX) -> không liên quan tới cáp, không khởi động lại.
+    resets.clear()
+
+    def no_mx(self):
+        raise RuntimeError("không tạo được control MX Component")
+
+    plc_mx.MxPlc._create, ch340.restart = no_mx, fake_restart
+    p = plc_mx.MxPlc({"enabled": True, "com_port": "COM12", "ch340_restart_on_error": True})
+    p._stop.wait = lambda s=None: time.sleep(0.02)
+    try:
+        p.start()
+        time.sleep(0.3)
+        assert resets == [], resets
+    finally:
+        p.stop()
+        plc_mx.MxPlc._create, ch340.restart = real
+
+    # Chỉ đúng cáp của PLC: chưa biết cổng / trùng cổng thiết bị khác thì không làm.
+    real_admin = ch340.is_admin
+    ch340.is_admin = lambda: True
+    try:
+        assert "chưa biết cổng" in ch340.check("", ["COM5"])
+        assert "trùng cổng" in ch340.check("com5", ["COM5", "COM3"])
+        assert ch340.check("COM12", ["COM5", "COM3"]) == ""
+    finally:
+        ch340.is_admin = real_admin
+    devs = [{"com": "COM12"}, {"com": "COM4"}]
+    assert ch340.pick(devs, "") is None and ch340.pick(devs, "COM9") is None
+    assert ch340.pick(devs, "com4")["com"] == "COM4"
+
+
 def t_probe():
     from app.devices import barcode, probe
     real = probe.open_serial
@@ -552,6 +650,8 @@ class Env:
                 "mongo": {"uri": "mongodb://127.0.0.1:%d" % MONGO},
                 "log": {"dir": os.path.join(self.dir, "logs")},
                 "servers": {"timeout_s": 3, "retry_s": 2},
+                # HYBRID mở thiết bị thật: không được khởi động lại cáp PLC của trạm đang chạy test.
+                "devices": {"plc": {"ch340_restart_on_error": False}},
                 "simulator": {"host": "127.0.0.1", "port": SIM}}, f)
         self.env = dict(os.environ, G8ID_CONFIG=self.cfg, G8ID_DATA=os.path.join(self.dir, "data"),
                         G8ID_NO_BROWSER="1", PYTHONUTF8="1", PYTHONUNBUFFERED="1")

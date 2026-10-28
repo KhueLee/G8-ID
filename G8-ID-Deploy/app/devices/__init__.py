@@ -64,7 +64,10 @@ def build(cfg, manual):
     from .plc_mx import MxPlc
     from .printer_godex import GodexPrinter
     from .scale import SerialScale
+    from ..config import com_ports
     d = cfg["devices"]
     raw = bool(cfg["log"].get("raw_device"))
+    # Cổng của cân / đầu đọc / máy in: PLC không bao giờ khởi động lại cáp trùng các cổng này.
+    others = lambda: [p for k, p in com_ports(d).items() if k != "plc"]
     return DeviceSet(SerialScale(d["scale"], raw), SerialBarcode(d["barcode"], raw),
-                     GodexPrinter(d["printer"]), MxPlc(d["plc"]))
+                     GodexPrinter(d["printer"]), MxPlc(d["plc"], others))
