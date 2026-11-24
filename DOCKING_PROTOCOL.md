@@ -1,6 +1,6 @@
 # G8 ID – Docking protocol (giao tiếp trạm định danh ↔ WMS / WCS / RCS)
 
-Phiên bản phần mềm trạm: **2.4.2**. Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
+Phiên bản phần mềm trạm: **2.4.12** (cập nhật tài liệu 25/11/2026). Tài liệu mô tả đúng hành vi của mã nguồn hiện tại
 (`G8-ID-Deploy/app/webui.py`, `app/engine.py`). Mục 8 liệt kê các điểm cần đối tác xác nhận.
 
 ## 1. Tổng quan
@@ -260,3 +260,10 @@ mã cũ nhưng nay gửi theo từng pallet, không còn trường `status: 8`.
 6. Khối lượng: WCS gửi `GW` (trạm hiểu là **kg / thùng**, bản tin 19/10/2026: `1.637` cho thùng 6
    bóng T50) – cần xác nhận đơn vị và là khối lượng một thùng. `MFG_Date` nhận `dd/mm/yyyy`
    (bản tin thật: `09/10/2026`).
+
+## 9. Đã chốt (25/11/2026)
+
+- Mục 8.3 và 8.4: pallet coi là xong khi IF-03 nhận **HTTP 2xx** (không xét `code` trong body); IF-05 lỗi chỉ hiện thông báo, không mở lại pallet. WCS gốc và WCS luồng B đều trả `{"code":1000}` cho IF-03.
+- Mục 8.6: `GW` = **kg / thùng** (vd. `1.637`), trạm đổi ra gam làm khối lượng chuẩn.
+- Mã vị trí (`Location`): bản tin thật của WCS gốc dùng dấu "." (vd. `S02.257.1`); chuẩn thống nhất của dự án là dấu "-" (`S02-257-1`, trùng tên điểm RCS). Trạm chỉ hiển thị trường này nên nhận cả hai.
+- 12 bàn định danh; mỗi bàn đặt `desk_no` riêng trong `config.json` (thiếu khoá thì hiện "Bàn 1").
